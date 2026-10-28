@@ -16,7 +16,7 @@ export async function enablePush() {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') throw new Error('Notification permission deny ho gayi. Browser settings se allow karo.');
 
-  const reg = await navigator.serviceWorker.register('/sw.js');
+  const reg = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
   await navigator.serviceWorker.ready;
 
   const { data } = await api.get('/notifications/public-key');
@@ -37,7 +37,7 @@ export async function enablePush() {
 export async function registerServiceWorker() {
   if (!pushSupported()) return;
   try {
-    await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
   } catch {
     /* ignore */
   }

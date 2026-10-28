@@ -9,8 +9,10 @@ import { AuthProvider } from './AuthContext';
 import { ToastProvider } from './Toast';
 import App from './App';
 import { registerServiceWorker } from './push';
+import { startAutoUpdate } from './autoUpdate';
 
 registerServiceWorker();
+startAutoUpdate();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
