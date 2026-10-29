@@ -22,6 +22,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
+import NotifyBanner from './NotifyBanner';
 import { prefetch } from '../cache';
 
 // Warm the page chunks + data so tab switches feel instant
@@ -108,6 +109,7 @@ export default function Layout() {
       </AppBar>
 
       <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 3 } }}>
+        <NotifyBanner />
         <Outlet />
       </Container>
 
