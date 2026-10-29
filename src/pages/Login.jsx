@@ -20,7 +20,7 @@ import { errMsg } from '../api';
 const FEATURES = [
   { icon: <CalendarMonthIcon />, text: 'Monthly calendar with daily tasks & habit ticks' },
   { icon: <AutoAwesomeIcon />, text: 'Gemini AI report every night at 12 AM' },
-  { icon: <NotificationsActiveIcon />, text: 'Reminders every 2 hours (browser + Gmail)' },
+  { icon: <NotificationsActiveIcon />, text: 'Reminders every hour (browser + Gmail)' },
 ];
 
 export default function Login() {

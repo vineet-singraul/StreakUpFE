@@ -84,9 +84,9 @@ export default function Settings() {
 
       <Card>
         <CardContent>
-          <Typography variant="h6">Reminders (every 2 hours)</Typography>
+          <Typography variant="h6">Reminders (every hour)</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Subah 8 se raat 10 baje tak har 2 ghante, agar aaj ke tasks pending hain.
+            Subah 8 se raat 10 baje tak har ghante, agar aaj ke tasks pending hain.
           </Typography>
 
           <Row
