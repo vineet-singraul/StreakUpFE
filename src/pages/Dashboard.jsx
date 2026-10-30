@@ -16,6 +16,22 @@ import { useAuth } from '../AuthContext';
 import MonthCalendar from '../components/MonthCalendar';
 import HabitGrid from '../components/HabitGrid';
 import TodaySummary from '../components/TodaySummary';
+import CompletionChart from '../components/CompletionChart';
+import { daysInMonth, monthLabel, pad } from '../utils';
+
+// Every day of the month gets a slot (shares the calendar's cached /tasks/month data)
+function MonthChart({ month, today }) {
+  const { data } = useApi('/tasks/month', { month });
+  const days = useMemo(() => {
+    if (!data) return undefined;
+    const byDate = new Map(data.days.map((d) => [d.date, d]));
+    return Array.from({ length: daysInMonth(month) }, (_, i) => {
+      const date = `${month}-${pad(i + 1)}`;
+      return { date, total: byDate.get(date)?.total || 0, done: byDate.get(date)?.done || 0 };
+    });
+  }, [data, month]);
+  return <CompletionChart title={`${monthLabel(month)}: daily progress`} days={days} today={today} loading />;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -105,6 +121,9 @@ export default function Dashboard() {
         >
           <MonthCalendar month={selected} today={cal.today} />
           <HabitGrid month={selected} />
+          <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
+            <MonthChart month={selected} today={cal.today} />
+          </Box>
         </Box>
       ) : (
         <Card>

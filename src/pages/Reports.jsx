@@ -9,9 +9,11 @@ import Skeleton from '@mui/material/Skeleton';
 import { useApi } from '../cache';
 import ReportCard from '../components/ReportCard';
 import ReasonsDialog from '../components/ReasonsDialog';
+import CompletionChart from '../components/CompletionChart';
 
 export default function Reports() {
   const { data, setData } = useApi('/reports');
+  const { data: daily } = useApi('/tasks/stats', { days: 30 });
   const [active, setActive] = useState(null);
 
   const onSaved = (updated) => {
@@ -54,6 +56,8 @@ export default function Reports() {
           </Card>
         ))}
       </Box>
+
+      <CompletionChart title="Last 30 days" days={daily?.days} today={daily?.today} loading />
 
       {data.reports.length === 0 ? (
         <Card>
