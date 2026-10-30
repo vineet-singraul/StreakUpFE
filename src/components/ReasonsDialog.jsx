@@ -14,6 +14,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import api, { errMsg } from '../api';
 import { useToast } from '../Toast';
 import { prettyDate } from '../utils';
+import { useT } from '../i18n';
 
 /**
  * Asks "why couldn't you complete these?" for a finished day's pending tasks.
@@ -23,6 +24,7 @@ export default function ReasonsDialog({ report: givenReport, open: givenOpen, on
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
   const toast = useToast();
+  const t = useT();
   const controlled = givenReport !== undefined;
 
   const [autoReport, setAutoReport] = useState(null);
@@ -63,7 +65,7 @@ export default function ReasonsDialog({ report: givenReport, open: givenOpen, on
       const { data } = await api.post(`/reports/${report._id}/reasons`, { reasons });
       setFeedback(data.report.aiFeedback);
       onSaved?.(data.report);
-      toast('Reasons save ho gaye');
+      toast(t('why.saved'));
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -75,11 +77,10 @@ export default function ReasonsDialog({ report: givenReport, open: givenOpen, on
 
   return (
     <Dialog open={open} onClose={close} fullScreen={fullScreen} fullWidth maxWidth="sm">
-      <DialogTitle>Ye tasks kyon nahi ho paaye? 🤔</DialogTitle>
+      <DialogTitle>{t('why.title')}</DialogTitle>
       <DialogContent dividers>
         <Typography color="text.secondary" sx={{ mb: 2 }}>
-          {prettyDate(report.date)}: aapne {report.completedCount}/{report.total} tasks complete kiye.
-          Honest reason likho, AI aapko kal ke liye better plan dega.
+          {t('why.intro', { date: prettyDate(report.date), done: report.completedCount, total: report.total })}
         </Typography>
 
         {feedback ? (
@@ -92,7 +93,7 @@ export default function ReasonsDialog({ report: givenReport, open: givenOpen, on
               <TextField
                 key={p.task}
                 label={p.title}
-                placeholder="Kyon nahi ho paaya?"
+                placeholder={t('why.placeholder')}
                 multiline
                 minRows={2}
                 value={reasons[p.task] || ''}
@@ -105,12 +106,12 @@ export default function ReasonsDialog({ report: givenReport, open: givenOpen, on
       </DialogContent>
       <DialogActions>
         {feedback ? (
-          <Button variant="contained" onClick={close}>Done</Button>
+          <Button variant="contained" onClick={close}>{t('why.done')}</Button>
         ) : (
           <>
-            <Button onClick={close}>Baad me</Button>
+            <Button onClick={close}>{t('why.later')}</Button>
             <Button variant="contained" onClick={submit} disabled={saving} startIcon={<AutoAwesomeIcon />}>
-              {saving ? 'AI soch raha hai...' : 'Submit & get AI advice'}
+              {saving ? t('why.thinking') : t('why.submit')}
             </Button>
           </>
         )}

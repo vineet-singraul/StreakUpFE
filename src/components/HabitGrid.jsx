@@ -18,11 +18,13 @@ import api, { errMsg } from '../api';
 import { useApi } from '../cache';
 import { useToast } from '../Toast';
 import { daysInMonth, pad } from '../utils';
+import { useT } from '../i18n';
 
 const isTemp = (id) => String(id).startsWith('tmp-');
 
 export default function HabitGrid({ month }) {
   const toast = useToast();
+  const t = useT();
   const { data, setData, reload } = useApi('/habits', { month });
   const [name, setName] = useState('');
 
@@ -66,7 +68,7 @@ export default function HabitGrid({ month }) {
   };
 
   const remove = async (habit) => {
-    if (!window.confirm(`"${habit.name}" delete karna hai?`)) return;
+    if (!window.confirm(t('habits.confirmDelete', { name: habit.name }))) return;
     setHabits((hs) => hs.filter((h) => h._id !== habit._id));
     try {
       await api.delete(`/habits/${habit._id}`);
@@ -77,7 +79,7 @@ export default function HabitGrid({ month }) {
 
   const copyPrevious = async () => {
     const { data: res } = await api.post('/habits/copy-previous');
-    toast(res.created ? `${res.created} habit(s) copy ho gayi` : 'Pichle month me copy karne layak habit nahi mili', res.created ? 'success' : 'info');
+    toast(res.created ? t('habits.copied', { n: res.created }) : t('habits.nothingToCopy'), res.created ? 'success' : 'info');
     reload();
   };
 
@@ -91,10 +93,10 @@ export default function HabitGrid({ month }) {
     <Card sx={{ minWidth: 0 }}>
       <CardContent>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2, gap: 1 }}>
-          <Typography variant="h6">Monthly Habits</Typography>
+          <Typography variant="h6">{t('habits.title')}</Typography>
           {data.editable && (
             <Button size="small" startIcon={<ContentCopyIcon />} onClick={copyPrevious}>
-              Last month
+              {t('habits.copy')}
             </Button>
           )}
         </Stack>
@@ -104,7 +106,7 @@ export default function HabitGrid({ month }) {
             <TextField
               size="small"
               fullWidth
-              placeholder="New habit, e.g. Gym, Reading 20 min, Water 3L"
+              placeholder={t('habits.placeholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -116,14 +118,14 @@ export default function HabitGrid({ month }) {
 
         {data.habits.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-            {data.editable ? 'Apni pehli habit add karo 👆' : 'Is month me koi habit nahi thi.'}
+            {data.editable ? t('habits.emptyEdit') : t('habits.emptyPast')}
           </Typography>
         ) : (
           <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2 }}>
             <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 }}>
               <thead>
                 <tr>
-                  <Box component="th" sx={stickyHead}>Habit</Box>
+                  <Box component="th" sx={stickyHead}>{t('habits.header')}</Box>
                   {dates.map((d) => (
                     <Box
                       component="th"
@@ -172,7 +174,7 @@ export default function HabitGrid({ month }) {
                             }}
                           >
                             {isToday ? (
-                              <Tooltip title="Aaj ka tick">
+                              <Tooltip title={t('habits.todayTick')}>
                                 <Checkbox size="small" checked={done} onChange={() => toggle(h)} disabled={isTemp(h._id)} sx={{ p: 0.25 }} />
                               </Tooltip>
                             ) : done ? (
@@ -193,7 +195,7 @@ export default function HabitGrid({ month }) {
         )}
         {data.editable && data.habits.length > 0 && (
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            Sirf aaj ka column tick ho sakta hai. Mobile par table ko side me scroll karo.
+            {t('habits.hint')}
           </Typography>
         )}
       </CardContent>

@@ -10,8 +10,10 @@ import { useApi } from '../cache';
 import ReportCard from '../components/ReportCard';
 import ReasonsDialog from '../components/ReasonsDialog';
 import CompletionChart from '../components/CompletionChart';
+import { useT } from '../i18n';
 
 export default function Reports() {
+  const t = useT();
   const { data, setData } = useApi('/reports');
   const { data: daily } = useApi('/tasks/stats', { days: 30 });
   const [active, setActive] = useState(null);
@@ -29,21 +31,21 @@ export default function Reports() {
   const perfectDays = finals.filter((r) => r.total && r.completedCount === r.total).length;
 
   const stats = [
-    ['Days tracked', finals.length],
-    ['Tasks done', `${doneTasks}/${totalTasks}`],
-    ['Completion', totalTasks ? `${Math.round((doneTasks / totalTasks) * 100)}%` : '-'],
-    ['Perfect days', perfectDays],
+    [t('reports.days'), finals.length],
+    [t('reports.tasksDone'), `${doneTasks}/${totalTasks}`],
+    [t('reports.completion'), totalTasks ? `${Math.round((doneTasks / totalTasks) * 100)}%` : '-'],
+    [t('reports.perfect'), perfectDays],
   ];
 
   return (
     <Stack spacing={{ xs: 2, md: 3 }}>
       <Box>
-        <Typography variant="h5">AI Reports</Typography>
-        <Typography color="text.secondary">Har raat 12 baje Gemini aapke din ki report banata hai.</Typography>
+        <Typography variant="h5">{t('nav.reports')}</Typography>
+        <Typography color="text.secondary">{t('reports.sub')}</Typography>
       </Box>
 
       {!data.aiEnabled && (
-        <Alert severity="warning">Gemini API key set nahi hai. Abhi basic report ban rahi hai. Backend/.env me GEMINI_API_KEY daalo.</Alert>
+        <Alert severity="warning">{t('reports.noAi')}</Alert>
       )}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
@@ -57,13 +59,13 @@ export default function Reports() {
         ))}
       </Box>
 
-      <CompletionChart title="Last 30 days" days={daily?.days} today={daily?.today} loading />
+      <CompletionChart title={t('chart.last30')} days={daily?.days} today={daily?.today} loading />
 
       {data.reports.length === 0 ? (
         <Card>
           <CardContent sx={{ textAlign: 'center', py: 6 }}>
-            <Typography variant="h6">Abhi koi report nahi hai</Typography>
-            <Typography color="text.secondary">Aaj tasks add karo. Raat 12 baje pehli report aa jayegi.</Typography>
+            <Typography variant="h6">{t('reports.emptyTitle')}</Typography>
+            <Typography color="text.secondary">{t('reports.emptySub')}</Typography>
           </CardContent>
         </Card>
       ) : (

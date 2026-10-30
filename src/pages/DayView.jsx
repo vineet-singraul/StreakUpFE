@@ -29,6 +29,7 @@ import { useToast } from '../Toast';
 import { prettyDate, pad } from '../utils';
 import ReasonsDialog from '../components/ReasonsDialog';
 import ReportCard from '../components/ReportCard';
+import { useT } from '../i18n';
 
 function shiftDate(date, days) {
   const [y, m, d] = date.split('-').map(Number);
@@ -40,6 +41,7 @@ export default function DayView() {
   const { date: param } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const t = useT();
 
   // '/tasks' (no params) is today's data, shared with the dashboard card via the cache
   const { data, error, setData, reload } = useApi('/tasks', param === 'today' ? undefined : { date: param });
@@ -74,7 +76,7 @@ export default function DayView() {
 
   const toggle = async (task) => {
     setTasks((ts) => ts.map((t) => (t._id === task._id ? { ...t, done: !t.done } : t)));
-    if (!task.done) toast('Shabash! Task complete ✅');
+    if (!task.done) toast(t('day.doneToast'));
     try {
       await api.patch(`/tasks/${task._id}`, { done: !task.done });
     } catch (err) {
@@ -109,7 +111,7 @@ export default function DayView() {
         <CardContent sx={{ textAlign: 'center', py: 6 }}>
           <LockClockIcon color="disabled" sx={{ fontSize: 48 }} />
           <Typography variant="h6" sx={{ mb: 1 }}>{errMsg(error)}</Typography>
-          <Button variant="contained" onClick={() => navigate('/day/today')}>Go to today</Button>
+          <Button variant="contained" onClick={() => navigate('/day/today')}>{t('day.goToday')}</Button>
         </CardContent>
       </Card>
     );
@@ -146,8 +148,8 @@ export default function DayView() {
             </IconButton>
             <Box sx={{ flexGrow: 1, textAlign: 'center' }}>
               <Typography variant="h6" sx={{ lineHeight: 1.2 }}>{prettyDate(data.date, true)}</Typography>
-              {isToday ? <Chip size="small" color="primary" label="Today" sx={{ mt: 0.5 }} /> : (
-                <Chip size="small" label="Read only" sx={{ mt: 0.5 }} />
+              {isToday ? <Chip size="small" color="primary" label={t('today.label')} sx={{ mt: 0.5 }} /> : (
+                <Chip size="small" label={t('day.readOnly')} sx={{ mt: 0.5 }} />
               )}
             </Box>
             <IconButton disabled={isToday} onClick={() => navigate(`/day/${shiftDate(data.date, 1)}`)}>
@@ -156,7 +158,7 @@ export default function DayView() {
           </Stack>
 
           <Stack direction="row" sx={{ justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography variant="body2" color="text.secondary">{done}/{total} completed</Typography>
+            <Typography variant="body2" color="text.secondary">{t('day.completed', { done, total })}</Typography>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>{pct}%</Typography>
           </Stack>
           <LinearProgress
@@ -171,20 +173,20 @@ export default function DayView() {
               <TextField
                 fullWidth
                 size="small"
-                placeholder="Aaj ka task likho..."
+                placeholder={t('day.placeholder')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
               />
               <Button type="submit" variant="contained" startIcon={<AddIcon />} sx={{ flexShrink: 0 }}>
-                Add
+                {t('day.add')}
               </Button>
             </Box>
           )}
 
           {total === 0 ? (
             <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
-              {data.editable ? 'Abhi koi task nahi. Upar se apne aaj ke saare tasks add karo.' : 'Is din koi task nahi tha.'}
+              {data.editable ? t('day.emptyEdit') : t('day.emptyPast')}
             </Typography>
           ) : (
             <List disablePadding>
@@ -232,9 +234,9 @@ export default function DayView() {
         {isToday && (
           <Card>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 1 }}>🤖 AI Report</Typography>
+              <Typography variant="h6" sx={{ mb: 1 }}>{t('day.aiTitle')}</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Final report raat 12 baje apne aap banegi aur Gmail par bhi aayegi. Abhi tak ka progress dekhna hai to:
+                {t('day.aiInfo')}
               </Typography>
               <Button
                 fullWidth
@@ -243,7 +245,7 @@ export default function DayView() {
                 onClick={generate}
                 disabled={generating || total === 0}
               >
-                {generating ? 'Gemini report bana raha hai...' : 'Generate AI report now'}
+                {generating ? t('day.generating') : t('day.generate')}
               </Button>
             </CardContent>
           </Card>
@@ -252,7 +254,7 @@ export default function DayView() {
         {report ? (
           <ReportCard report={report} onAskReasons={() => setReasonsOpen(true)} />
         ) : (
-          !isToday && total > 0 && <Alert severity="info">Is din ki report abhi generate nahi hui.</Alert>
+          !isToday && total > 0 && <Alert severity="info">{t('day.noReport')}</Alert>
         )}
       </Stack>
 

@@ -7,6 +7,7 @@ import { useToast } from '../Toast';
 import { errMsg } from '../api';
 import api from '../api';
 import { enablePush, pushSupported } from '../push';
+import { useT } from '../i18n';
 
 const DISMISS_KEY = 'ht_notify_banner_dismissed';
 
@@ -14,6 +15,7 @@ const DISMISS_KEY = 'ht_notify_banner_dismissed';
 export default function NotifyBanner() {
   const { user, setUser } = useAuth();
   const toast = useToast();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
     try {
@@ -30,7 +32,7 @@ export default function NotifyBanner() {
     try {
       setUser(await enablePush());
       await api.post('/notifications/test');
-      toast('Notifications ON ho gaye 🔔');
+      toast(t('notify.on'));
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -55,11 +57,11 @@ export default function NotifyBanner() {
       sx={{ mb: 2, alignItems: 'center' }}
       action={
         <Button color="inherit" size="small" variant="outlined" onClick={enable} disabled={busy} sx={{ mr: 1 }}>
-          Enable
+          {t('notify.enable')}
         </Button>
       }
     >
-      Har ghante task reminder pane ke liye browser notifications ON karo (email na aaye tab bhi milega).
+      {t('notify.text')}
     </Alert>
   );
 }

@@ -16,15 +16,17 @@ import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useAuth } from '../AuthContext';
 import { errMsg } from '../api';
+import { useT } from '../i18n';
 
 const FEATURES = [
-  { icon: <CalendarMonthIcon />, text: 'Monthly calendar with daily tasks & habit ticks' },
-  { icon: <AutoAwesomeIcon />, text: 'Gemini AI report every night at 12 AM' },
-  { icon: <NotificationsActiveIcon />, text: 'Reminders every hour (browser + Gmail)' },
+  { icon: <CalendarMonthIcon />, text: 'login.f1' },
+  { icon: <AutoAwesomeIcon />, text: 'login.f2' },
+  { icon: <NotificationsActiveIcon />, text: 'login.f3' },
 ];
 
 export default function Login() {
   const { loginWithGoogle } = useAuth();
+  const t = useT();
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin');
   const [error, setError] = useState('');
@@ -66,15 +68,15 @@ export default function Login() {
         }}
       >
         <TaskAltIcon sx={{ fontSize: 56, mb: 2 }} />
-        <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>Build habits that stick.</Typography>
+        <Typography variant="h3" sx={{ fontWeight: 800, mb: 2 }}>{t('login.hero')}</Typography>
         <Typography sx={{ opacity: 0.9, mb: 4, fontSize: 18 }}>
-          Roz ke tasks likho, tick karo, aur AI se honest report pao.
+          {t('login.heroSub')}
         </Typography>
         <Stack spacing={2}>
           {FEATURES.map((f) => (
             <Stack key={f.text} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
               {f.icon}
-              <Typography>{f.text}</Typography>
+              <Typography>{t(f.text)}</Typography>
             </Stack>
           ))}
         </Stack>
@@ -88,7 +90,7 @@ export default function Login() {
             </Stack>
             <Typography variant="h5" sx={{ textAlign: 'center' }}>Habit Tracker</Typography>
             <Typography color="text.secondary" sx={{ textAlign: 'center', mb: 3 }}>
-              {mode === 'signin' ? 'Welcome back! Sign in to continue.' : 'Create your account in one click.'}
+              {mode === 'signin' ? t('login.welcome') : t('login.create')}
             </Typography>
 
             <Tabs value={mode} onChange={(_, v) => { setMode(v); setError(''); }} variant="fullWidth" sx={{ mb: 3 }}>
@@ -110,7 +112,7 @@ export default function Login() {
                 <GoogleLogin
                   key={mode}
                   onSuccess={onSuccess}
-                  onError={() => setError('Google login cancel / fail ho gaya')}
+                  onError={() => setError(t('login.failed'))}
                   text={mode === 'signin' ? 'signin_with' : 'signup_with'}
                   shape="pill"
                   size="large"
@@ -119,7 +121,7 @@ export default function Login() {
             </Box>
 
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 3 }}>
-              {mode === 'signin' ? 'Naya account? ' : 'Pehle se account hai? '}
+              {mode === 'signin' ? t('login.new') : t('login.have')}
               <Box
                 component="span"
                 sx={{ color: 'primary.main', cursor: 'pointer', fontWeight: 600 }}

@@ -15,6 +15,10 @@ import api, { errMsg } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import { enablePush, pushSupported } from '../push';
+import { useT, LANGS, translate } from '../i18n';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import TranslateIcon from '@mui/icons-material/Translate';
 
 function Row({ icon, title, subtitle, action }) {
   return (
@@ -32,6 +36,7 @@ function Row({ icon, title, subtitle, action }) {
 export default function Settings() {
   const { user, setUser } = useAuth();
   const toast = useToast();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const permission = pushSupported() ? Notification.permission : 'unsupported';
 
@@ -40,13 +45,23 @@ export default function Settings() {
     setUser(data.user);
   };
 
+  const changeLanguage = async (_, code) => {
+    if (!code || code === user?.language) return;
+    try {
+      await update({ language: code });
+      toast(translate(code, 'set.saved'));
+    } catch (err) {
+      toast(errMsg(err), 'error');
+    }
+  };
+
   const turnOnPush = async () => {
     setBusy(true);
     try {
       const u = await enablePush();
       setUser(u);
       await api.post('/notifications/test');
-      toast('Browser notifications ON ho gaye 🔔');
+      toast(t('notify.on'));
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -68,7 +83,7 @@ export default function Settings() {
 
   return (
     <Stack spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 720 }}>
-      <Typography variant="h5">Settings</Typography>
+      <Typography variant="h5">{t('nav.settings')}</Typography>
 
       <Card>
         <CardContent>
@@ -84,25 +99,40 @@ export default function Settings() {
 
       <Card>
         <CardContent>
-          <Typography variant="h6">Reminders (every hour)</Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
+            <TranslateIcon color="primary" />
+            <Typography variant="h6">{t('set.language')}</Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{t('set.languageSub')}</Typography>
+          <ToggleButtonGroup exclusive fullWidth color="primary" value={user?.language || 'hinglish'} onChange={changeLanguage}>
+            {LANGS.map((l) => (
+              <ToggleButton key={l.code} value={l.code} sx={{ fontWeight: 600 }}>{l.label}</ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <Typography variant="h6">{t('set.reminders')}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Subah 8 se raat 10 baje tak har ghante, agar aaj ke tasks pending hain.
+            {t('set.remindersSub')}
           </Typography>
 
           <Row
             icon={<NotificationsActiveIcon color="primary" />}
-            title="Browser notifications"
+            title={t('set.push')}
             subtitle={
-              permission === 'unsupported' ? 'Ye browser support nahi karta'
-                : permission === 'denied' ? 'Blocked hai. Browser site settings se Allow karo.'
-                  : user?.pushEnabled ? 'Is device par ON hai' : 'Is device par abhi OFF hai'
+              permission === 'unsupported' ? t('set.pushUnsupported')
+                : permission === 'denied' ? t('set.pushDenied')
+                  : user?.pushEnabled ? t('set.pushOn') : t('set.pushOff')
             }
             action={
               user?.pushEnabled && permission === 'granted' ? (
                 <Switch checked={user.pushReminders} onChange={(e) => update({ pushReminders: e.target.checked })} />
               ) : (
                 <Button variant="contained" size="small" onClick={turnOnPush} disabled={busy || permission === 'unsupported'}>
-                  Enable
+                  {t('notify.enable')}
                 </Button>
               )
             }
@@ -110,13 +140,13 @@ export default function Settings() {
           <Divider />
           <Row
             icon={<EmailIcon color="primary" />}
-            title="Gmail reminders"
-            subtitle={`Reminder + 12 AM report ${user?.email} par`}
+            title={t('set.gmail')}
+            subtitle={t('set.gmailSub', { email: user?.email })}
             action={<Switch checked={Boolean(user?.emailReminders)} onChange={(e) => update({ emailReminders: e.target.checked })} />}
           />
           <Divider sx={{ mb: 2 }} />
           <Button variant="outlined" startIcon={<SendIcon />} onClick={remindNow} disabled={busy} fullWidth>
-            Abhi test reminder bhejo
+            {t('set.test')}
           </Button>
         </CardContent>
       </Card>

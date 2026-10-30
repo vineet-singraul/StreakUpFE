@@ -18,9 +18,11 @@ import HabitGrid from '../components/HabitGrid';
 import TodaySummary from '../components/TodaySummary';
 import CompletionChart from '../components/CompletionChart';
 import { daysInMonth, monthLabel, pad } from '../utils';
+import { useT } from '../i18n';
 
 // Every day of the month gets a slot (shares the calendar's cached /tasks/month data)
 function MonthChart({ month, today }) {
+  const t = useT();
   const { data } = useApi('/tasks/month', { month });
   const days = useMemo(() => {
     if (!data) return undefined;
@@ -30,11 +32,12 @@ function MonthChart({ month, today }) {
       return { date, total: byDate.get(date)?.total || 0, done: byDate.get(date)?.done || 0 };
     });
   }, [data, month]);
-  return <CompletionChart title={`${monthLabel(month)}: daily progress`} days={days} today={today} loading />;
+  return <CompletionChart title={t('chart.monthTitle', { month: monthLabel(month) })} days={days} today={today} loading />;
 }
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const t = useT();
   const [params, setParams] = useSearchParams();
   const { data: cal } = useApi('/calendar');
 
@@ -64,8 +67,8 @@ export default function Dashboard() {
   return (
     <Stack spacing={{ xs: 2, md: 3 }}>
       <Box>
-        <Typography variant="h5">Namaste, {user?.name?.split(' ')[0]} 👋</Typography>
-        <Typography color="text.secondary">Aaj ke tasks complete karo aur habits tick karo.</Typography>
+        <Typography variant="h5">{t('dash.hello', { name: user?.name?.split(' ')[0] })}</Typography>
+        <Typography color="text.secondary">{t('dash.sub')}</Typography>
       </Box>
 
       <TodaySummary />
@@ -101,7 +104,7 @@ export default function Dashboard() {
                   />
                 );
                 return m.locked ? (
-                  <Tooltip key={m.key} title="Ye month abhi shuru nahi hua">
+                  <Tooltip key={m.key} title={t('month.lockedTip')}>
                     <span>{chip}</span>
                   </Tooltip>
                 ) : chip;
@@ -129,8 +132,8 @@ export default function Dashboard() {
         <Card>
           <CardContent sx={{ textAlign: 'center', py: 6 }}>
             <LockIcon color="disabled" sx={{ fontSize: 48 }} />
-            <Typography variant="h6">Ye month abhi locked hai</Typography>
-            <Typography color="text.secondary">Month shuru hone par ye apne aap open ho jayega.</Typography>
+            <Typography variant="h6">{t('month.locked')}</Typography>
+            <Typography color="text.secondary">{t('month.lockedSub')}</Typography>
           </CardContent>
         </Card>
       )}

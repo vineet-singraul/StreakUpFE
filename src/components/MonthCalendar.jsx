@@ -8,6 +8,7 @@ import ButtonBase from '@mui/material/ButtonBase';
 import { alpha } from '@mui/material/styles';
 import { useApi } from '../cache';
 import { WEEKDAYS, daysInMonth, firstWeekday, monthLabel, pad } from '../utils';
+import { useT } from '../i18n';
 
 function dayColor(theme, info) {
   if (!info?.total) return 'transparent';
@@ -19,6 +20,7 @@ function dayColor(theme, info) {
 
 export default function MonthCalendar({ month, today }) {
   const navigate = useNavigate();
+  const t = useT();
   const { data } = useApi('/tasks/month', { month });
   const days = useMemo(() => Object.fromEntries((data?.days || []).map((d) => [d.date, d])), [data]);
 
@@ -75,7 +77,7 @@ export default function MonthCalendar({ month, today }) {
         </Box>
         <Box sx={{ display: 'flex', gap: 2, mt: 2, flexWrap: 'wrap' }}>
           {[
-            ['success.main', 'All done'],
+            ['success.main', t('cal.allDone')],
             ['warning.main', '50%+'],
             ['error.main', '< 50%'],
           ].map(([c, l]) => (

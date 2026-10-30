@@ -9,9 +9,11 @@ import Skeleton from '@mui/material/Skeleton';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useApi } from '../cache';
 import { prettyDate } from '../utils';
+import { useT } from '../i18n';
 
 export default function TodaySummary() {
   const navigate = useNavigate();
+  const t = useT();
   const { data } = useApi('/tasks');
 
   if (!data) return <Skeleton variant="rounded" height={104} />;
@@ -36,9 +38,9 @@ export default function TodaySummary() {
           </Box>
         </Box>
         <Box sx={{ flexGrow: 1, minWidth: 160 }}>
-          <Typography sx={{ opacity: 0.85 }}>Today · {prettyDate(data.today, true)}</Typography>
+          <Typography sx={{ opacity: 0.85 }}>{t('today.label')} · {prettyDate(data.today, true)}</Typography>
           <Typography variant="h5">
-            {total ? `${done}/${total} tasks done` : 'Aaj ke tasks abhi add nahi kiye'}
+            {total ? t('today.done', { done, total }) : t('today.none')}
           </Typography>
         </Box>
         <Button
@@ -48,7 +50,7 @@ export default function TodaySummary() {
           onClick={() => navigate('/day/today')}
           sx={{ color: 'primary.main', bgcolor: '#fff', width: { xs: '100%', sm: 'auto' } }}
         >
-          {total ? 'Open today' : 'Add tasks'}
+          {total ? t('today.open') : t('today.add')}
         </Button>
       </CardContent>
     </Card>

@@ -23,6 +23,8 @@ export function AuthProvider({ children }) {
     try {
       if (u) localStorage.setItem(USER_KEY, JSON.stringify(u));
       else localStorage.removeItem(USER_KEY);
+      // Remembered for the login page too, where there is no user yet
+      if (u?.language) localStorage.setItem('ht_lang', u.language);
     } catch {
       /* ignore */
     }

@@ -15,6 +15,7 @@ import TableCell from '@mui/material/TableCell';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import TableRowsIcon from '@mui/icons-material/TableRows';
 import { prettyDate } from '../utils';
+import { useT } from '../i18n';
 
 const HEIGHT = 200;
 const M = { top: 12, right: 8, bottom: 26, left: 40 };
@@ -58,6 +59,7 @@ function useWidth() {
 export default function CompletionChart({ title, days, today, loading }) {
   const [ref, width] = useWidth();
   const [view, setView] = useState('chart');
+  const t = useT();
   const [active, setActive] = useState(null);
 
   const tracked = useMemo(() => (days || []).filter((d) => d.total > 0), [days]);
@@ -84,8 +86,8 @@ export default function CompletionChart({ title, days, today, loading }) {
             <Typography variant="h6">{title}</Typography>
             <Typography variant="body2" color="text.secondary">
               {avg === null
-                ? 'Roz ka task completion %'
-                : `Average ${avg}% · ${tracked.length} din tracked${best ? ` · Best ${pctOf(best)}% on ${shortDate(best.date)}` : ''}`}
+                ? t('chart.sub')
+                : t('chart.summary', { avg, n: tracked.length, best: pctOf(best), date: shortDate(best.date) })}
             </Typography>
           </Box>
           <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)}>
@@ -101,9 +103,9 @@ export default function CompletionChart({ title, days, today, loading }) {
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell align="right">Done</TableCell>
-                  <TableCell align="right">Total</TableCell>
+                  <TableCell>{t('chart.date')}</TableCell>
+                  <TableCell align="right">{t('chart.done')}</TableCell>
+                  <TableCell align="right">{t('chart.total')}</TableCell>
                   <TableCell align="right">%</TableCell>
                 </TableRow>
               </TableHead>
@@ -202,7 +204,7 @@ export default function CompletionChart({ title, days, today, loading }) {
             {tracked.length === 0 && (
               <Box sx={{ position: 'absolute', inset: `${M.top}px ${M.right}px ${M.bottom}px ${M.left}px`, display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
                 <Typography variant="body2" color="text.secondary" sx={{ bgcolor: 'background.paper', px: 1.5, py: 0.5, borderRadius: 1 }}>
-                  Abhi data nahi hai. Tasks add karo, bars yahan dikhenge.
+                  {t('chart.empty')}
                 </Typography>
               </Box>
             )}
@@ -231,11 +233,11 @@ export default function CompletionChart({ title, days, today, loading }) {
                   <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: 'var(--bar)' }} />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {activeDay.done}/{activeDay.total} done · {pctOf(activeDay)}%
+                      {t('chart.tip', { done: activeDay.done, total: activeDay.total, pct: pctOf(activeDay) })}
                     </Typography>
                   </Stack>
                 ) : (
-                  <Typography variant="body2">{today && activeDay.date > today ? 'Abhi aane wala din' : 'Koi task nahi'}</Typography>
+                  <Typography variant="body2">{today && activeDay.date > today ? t('chart.upcoming') : t('chart.noTasks')}</Typography>
                 )}
               </Box>
             )}

@@ -24,6 +24,7 @@ import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
 import NotifyBanner from './NotifyBanner';
 import { prefetch } from '../cache';
+import { useT } from '../i18n';
 
 // Warm the page chunks + data so tab switches feel instant
 function warmUp() {
@@ -35,10 +36,10 @@ function warmUp() {
 }
 
 const NAV = [
-  { label: 'Calendar', path: '/', icon: <CalendarMonthIcon /> },
-  { label: 'Today', path: '/day/today', icon: <TodayIcon /> },
-  { label: 'AI Reports', path: '/reports', icon: <InsightsIcon /> },
-  { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
+  { label: 'nav.calendar', path: '/', icon: <CalendarMonthIcon /> },
+  { label: 'nav.today', path: '/day/today', icon: <TodayIcon /> },
+  { label: 'nav.reports', path: '/reports', icon: <InsightsIcon /> },
+  { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
 function activeIndex(pathname) {
@@ -50,6 +51,7 @@ function activeIndex(pathname) {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const t = useT();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [anchor, setAnchor] = useState(null);
@@ -83,7 +85,7 @@ export default function Layout() {
                 onClick={() => navigate(item.path)}
                 sx={{ opacity: active === i ? 1 : 0.8 }}
               >
-                {item.label}
+                {t(item.label)}
               </Button>
             ))}
           </Box>
@@ -98,11 +100,11 @@ export default function Layout() {
             </Box>
             <MenuItem onClick={() => { setAnchor(null); navigate('/settings'); }}>
               <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
-              Settings
+              {t('nav.settings')}
             </MenuItem>
             <MenuItem onClick={() => { setAnchor(null); logout(); navigate('/login'); }}>
               <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-              Logout
+              {t('logout')}
             </MenuItem>
           </Menu>
         </Toolbar>
@@ -120,7 +122,7 @@ export default function Layout() {
       >
         <BottomNavigation showLabels value={active} onChange={(_, i) => navigate(NAV[i].path)}>
           {NAV.map((item) => (
-            <BottomNavigationAction key={item.path} label={item.label} icon={item.icon} />
+            <BottomNavigationAction key={item.path} label={t(item.label)} icon={item.icon} />
           ))}
         </BottomNavigation>
       </Paper>
