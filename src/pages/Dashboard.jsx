@@ -14,25 +14,36 @@ import LockIcon from '@mui/icons-material/Lock';
 import { useApi } from '../cache';
 import { useAuth } from '../AuthContext';
 import MonthCalendar from '../components/MonthCalendar';
-import HabitGrid from '../components/HabitGrid';
 import TodaySummary from '../components/TodaySummary';
-import CompletionChart from '../components/CompletionChart';
-import { daysInMonth, monthLabel, pad } from '../utils';
 import { useT } from '../i18n';
+import TrendLineChart from '../components/TrendLineChart';
+import { daysInMonth, monthLabel, pad } from '../utils';
 
-// Every day of the month gets a slot (shares the calendar's cached /tasks/month data)
-function MonthChart({ month, today }) {
+// Task completion % for each day of the month (shares the calendar's cached /tasks/month data)
+function MonthLine({ month, today }) {
   const t = useT();
   const { data } = useApi('/tasks/month', { month });
-  const days = useMemo(() => {
-    if (!data) return undefined;
-    const byDate = new Map(data.days.map((d) => [d.date, d]));
-    return Array.from({ length: daysInMonth(month) }, (_, i) => {
-      const date = `${month}-${pad(i + 1)}`;
-      return { date, total: byDate.get(date)?.total || 0, done: byDate.get(date)?.done || 0 };
-    });
-  }, [data, month]);
-  return <CompletionChart title={t('chart.monthTitle', { month: monthLabel(month) })} days={days} today={today} loading />;
+  const n = daysInMonth(month);
+  const points = useMemo(() => {
+    const byDate = new Map((data?.days || []).map((d) => [d.date, d]));
+    return Array.from({ length: n }, (_, k) => k + 1)
+      .map((i) => ({ i, d: byDate.get(`${month}-${pad(i)}`) }))
+      .filter(({ d }) => d?.total)
+      .map(({ i, d }) => ({ i, pct: Math.round((d.done / d.total) * 100), tip: `${i} · ${d.done}/${d.total} · ${Math.round((d.done / d.total) * 100)}%` }));
+  }, [data, month, n]);
+  const avg = points.length ? Math.round(points.reduce((s, p) => s + p.pct, 0) / points.length) : null;
+  const isCurrent = today.startsWith(month);
+  return (
+    <TrendLineChart
+      title={t('chart.monthTitle', { month: monthLabel(month) })}
+      subtitle={avg === null ? t('chart.sub') : t('ch.lineSub', { avg })}
+      n={n}
+      points={points}
+      xLabel={(i) => i}
+      highlight={isCurrent ? Number(today.slice(8)) : null}
+      emptyText={t('chart.empty')}
+    />
+  );
 }
 
 export default function Dashboard() {
@@ -114,19 +125,9 @@ export default function Dashboard() {
       </Card>
 
       {selectedInfo && !selectedInfo.locked ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: { xs: 2, md: 3 },
-            gridTemplateColumns: { xs: '1fr', lg: '420px 1fr' },
-            alignItems: 'start',
-          }}
-        >
+        <Box sx={{ display: 'grid', gap: { xs: 2, md: 3 }, gridTemplateColumns: { xs: '1fr', lg: '420px 1fr' }, alignItems: 'start' }}>
           <MonthCalendar month={selected} today={cal.today} />
-          <HabitGrid month={selected} />
-          <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
-            <MonthChart month={selected} today={cal.today} />
-          </Box>
+          <MonthLine month={selected} today={cal.today} />
         </Box>
       ) : (
         <Card>

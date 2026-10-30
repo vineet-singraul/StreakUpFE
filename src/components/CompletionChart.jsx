@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
@@ -40,16 +40,17 @@ function barPath(x, y, w, h) {
   return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
 }
 
+// Callback ref, so the box is measured even when it mounts after the loading skeleton
 function useWidth() {
-  const ref = useRef(null);
+  const [el, setEl] = useState(null);
   const [width, setWidth] = useState(0);
   useEffect(() => {
-    if (!ref.current) return undefined;
+    if (!el) return undefined;
     const ro = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
-    ro.observe(ref.current);
+    ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-  return [ref, width];
+  }, [el]);
+  return [setEl, width];
 }
 
 /**
