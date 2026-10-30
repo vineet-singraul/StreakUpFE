@@ -123,9 +123,10 @@ export default function Layout() {
         elevation={8}
         sx={{ display: { xs: 'block', md: 'none' }, position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1100 }}
       >
-        <BottomNavigation showLabels value={active} onChange={(_, i) => navigate(NAV[i].path)}>
+        <BottomNavigation value={active} onChange={(_, i) => navigate(NAV[i].path)}>
           {NAV.map((item) => (
-            <BottomNavigationAction key={item.path} label={t(item.label)} icon={item.icon} />
+            // Icons only on mobile; the name stays available to screen readers
+            <BottomNavigationAction key={item.path} aria-label={t(item.label)} icon={item.icon} sx={{ minWidth: 0 }} />
           ))}
         </BottomNavigation>
       </Paper>
