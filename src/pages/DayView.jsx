@@ -18,6 +18,7 @@ import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -204,13 +205,18 @@ export default function DayView() {
                   }
                 >
                   <ListItemIcon sx={{ minWidth: 42 }}>
-                    <Checkbox
-                      edge="start"
-                      checked={t.done}
-                      disabled={!data.editable || String(t._id).startsWith('tmp-')}
-                      onChange={() => toggle(t)}
-                      color="success"
-                    />
+                    {/* a past day's unticked task is marked missed */}
+                    {!data.editable && !t.done ? (
+                      <CloseIcon color="error" sx={{ ml: 0.5 }} />
+                    ) : (
+                      <Checkbox
+                        edge="start"
+                        checked={t.done}
+                        disabled={!data.editable || String(t._id).startsWith('tmp-')}
+                        onChange={() => toggle(t)}
+                        color="success"
+                      />
+                    )}
                   </ListItemIcon>
                   <ListItemText
                     primary={t.title}

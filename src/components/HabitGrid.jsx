@@ -14,6 +14,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
 import api, { errMsg } from '../api';
 import { useApi } from '../cache';
 import { useToast } from '../Toast';
@@ -21,6 +22,10 @@ import { daysInMonth, pad } from '../utils';
 import { useT } from '../i18n';
 
 const isTemp = (id) => String(id).startsWith('tmp-');
+// IST date the habit was added; days before that aren't counted as missed
+const createdOn = (h) => (h.createdAt
+  ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(h.createdAt))
+  : '0000-00-00');
 
 export default function HabitGrid({ month }) {
   const toast = useToast();
@@ -179,6 +184,9 @@ export default function HabitGrid({ month }) {
                               </Tooltip>
                             ) : done ? (
                               <CheckCircleIcon color="success" sx={{ fontSize: 18 }} />
+                            ) : d < data.today && d >= createdOn(h) ? (
+                              // day is over and wasn't ticked: missed by default
+                              <CloseIcon color="error" sx={{ fontSize: 16 }} />
                             ) : (
                               <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'divider', mx: 'auto' }} />
                             )}
