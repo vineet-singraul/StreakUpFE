@@ -18,6 +18,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import TodayIcon from '@mui/icons-material/Today';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SettingsIcon from '@mui/icons-material/Settings';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LogoutIcon from '@mui/icons-material/Logout';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { useAuth } from '../AuthContext';
@@ -39,13 +40,15 @@ const NAV = [
   { label: 'nav.calendar', path: '/', icon: <CalendarMonthIcon /> },
   { label: 'nav.today', path: '/day/today', icon: <TodayIcon /> },
   { label: 'nav.reports', path: '/reports', icon: <InsightsIcon /> },
+  { label: 'nav.challenge', path: '/challenge', icon: <EmojiEventsIcon /> },
   { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
 function activeIndex(pathname) {
   if (pathname.startsWith('/day/')) return 1;
   if (pathname.startsWith('/reports')) return 2;
-  if (pathname.startsWith('/settings')) return 3;
+  if (pathname.startsWith('/challenge')) return 3;
+  if (pathname.startsWith('/settings')) return 4;
   return 0;
 }
 

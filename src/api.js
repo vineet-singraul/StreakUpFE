@@ -2,7 +2,13 @@ import axios from 'axios';
 
 export const TOKEN_KEY = 'ht_token';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/api' });
+// In production call Render directly (skips the extra Vercel proxy hop), even if a Vercel
+// env var still says "/api". In dev, "/api" goes through the Vite proxy.
+const LIVE_API = 'https://streakupbe.onrender.com/api';
+const envUrl = import.meta.env.VITE_API_URL;
+const baseURL = envUrl?.startsWith('http') ? envUrl : import.meta.env.PROD ? LIVE_API : envUrl || '/api';
+
+const api = axios.create({ baseURL });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY);
