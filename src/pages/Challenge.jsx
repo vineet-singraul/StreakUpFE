@@ -30,6 +30,9 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import StarIcon from '@mui/icons-material/Star';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 import api, { errMsg } from '../api';
 import { useApi } from '../cache';
 import { useToast } from '../Toast';
@@ -40,7 +43,7 @@ const SAMPLE = 'Wake up 5 AM\nWorkout 45 min\nNo junk food\nRead 10 pages\n3L wa
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 /* ---------- start form ---------- */
-function StartForm({ onStarted, onHistory }) {
+function StartForm({ onStarted, onHistory, onCancel }) {
   const t = useT();
   const toast = useToast();
   const [days, setDays] = useState('');
@@ -104,7 +107,8 @@ function StartForm({ onStarted, onHistory }) {
             <Button variant="contained" size="large" startIcon={<EmojiEventsIcon />} onClick={start} disabled={busy} sx={{ flexGrow: 1 }}>
               {t('ch.start')}
             </Button>
-            <Button variant="outlined" size="large" startIcon={<HistoryIcon />} onClick={onHistory}>{t('ch.history')}</Button>
+            {onHistory && <Button variant="outlined" size="large" startIcon={<HistoryIcon />} onClick={onHistory}>{t('ch.history')}</Button>}
+            {onCancel && <Button size="large" onClick={onCancel}>{t('ch.cancel')}</Button>}
           </Stack>
         </Stack>
       </CardContent>
@@ -311,7 +315,7 @@ function EditDialog({ c, open, onClose, onSaved }) {
   const save = async () => {
     setBusy(true);
     try {
-      const { data } = await api.patch('/challenge', { title, items });
+      const { data } = await api.patch(`/challenge/${c._id}`, { title, items });
       onSaved(data.challenge);
       toast(t('ch.saved'));
       onClose();
@@ -357,10 +361,35 @@ function EditDialog({ c, open, onClose, onSaved }) {
 }
 
 /* ---------- history: a box per challenge (finished ones first) -> full-screen popup ---------- */
-function ChallengeDetail({ id, onClose }) {
+// Day number of today inside a challenge (1-based), from the device date
+const dayToday = (startDate) => {
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const [y, m, d] = startDate.split('-').map(Number);
+  return Math.floor((today - Date.UTC(y, m - 1, d)) / 86400000) + 1;
+};
+
+function ChallengeDetail({ id, onClose, onResumed }) {
   const t = useT();
+  const toast = useToast();
   const { data } = useApi(id ? `/challenge/${id}` : null);
   const sel = data?.challenge;
+  const [busy, setBusy] = useState(false);
+  // ended early but its days are not over yet -> it can be continued
+  const canResume = sel && !sel.active && dayToday(sel.startDate) <= sel.days;
+
+  const resume = async () => {
+    setBusy(true);
+    try {
+      const { data: res } = await api.post(`/challenge/${sel._id}/resume`);
+      toast(t('ch.resumed'));
+      onResumed(res.challenge);
+    } catch (err) {
+      toast(errMsg(err), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <Dialog open={Boolean(id)} onClose={onClose} fullScreen>
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, background: HERO_BG, color: '#fff' }}>
@@ -377,9 +406,14 @@ function ChallengeDetail({ id, onClose }) {
           <Skeleton variant="rounded" height={300} sx={{ mt: 2 }} />
         ) : (
           <Stack spacing={{ xs: 2, md: 3 }} sx={{ pt: 2, maxWidth: 1400, mx: 'auto' }}>
-            <Typography variant="body2" color="text.secondary">
-              {prettyDate(sel.startDate)}{sel.endedAt ? ` → ${prettyDate(sel.endedAt)}` : ''}
-            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}>
+              <Typography variant="body2" color="text.secondary">
+                {prettyDate(sel.startDate)}{sel.endedAt ? ` → ${prettyDate(sel.endedAt)}` : ''}
+              </Typography>
+              {canResume && (
+                <Button variant="contained" startIcon={<RestartAltIcon />} onClick={resume} disabled={busy}>{t('ch.resume')}</Button>
+              )}
+            </Stack>
             <Stats c={sel} />
             <ChallengeLineChart c={sel} />
             <Card sx={{ minWidth: 0 }}>
@@ -396,7 +430,7 @@ function ChallengeDetail({ id, onClose }) {
 }
 
 /* Opened only from the History button: full-screen list of challenge boxes */
-function HistoryDialog({ open, onClose }) {
+function HistoryDialog({ open, onClose, onResumed }) {
   const t = useT();
   const { data } = useApi(open ? '/challenge/history' : null);
   const [openId, setOpenId] = useState(null);
@@ -447,7 +481,15 @@ function HistoryDialog({ open, onClose }) {
       )}
       </Box>
       </DialogContent>
-      <ChallengeDetail id={openId} onClose={() => setOpenId(null)} />
+      <ChallengeDetail
+        id={openId}
+        onClose={() => setOpenId(null)}
+        onResumed={(c) => {
+          setOpenId(null);
+          onClose();
+          onResumed(c);
+        }}
+      />
     </Dialog>
   );
 }
@@ -459,9 +501,22 @@ export default function Challenge() {
   const { data, setData } = useApi('/challenge');
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const c = data?.challenge;
+  const [newOpen, setNewOpen] = useState(false);
+  const [selId, setSelId] = useState(null);
+  // several challenges can run at once; older API versions only send `challenge`
+  const list = data ? data.challenges || (data.challenge ? [data.challenge] : []) : [];
+  const c = list.find((x) => x._id === selId) || list.at(-1);
 
-  const setChallenge = (challenge) => setData((d) => ({ ...d, challenge }));
+  const setList = (fn) => setData((d) => {
+    const next = fn(d.challenges || (d.challenge ? [d.challenge] : []));
+    return { ...d, challenges: next, challenge: next.at(-1) || null };
+  });
+  const setChallenge = (challenge) => setList((arr) => arr.map((x) => (x._id === challenge._id ? challenge : x)));
+  const addChallenge = (challenge) => {
+    setList((arr) => [...arr.filter((x) => x._id !== challenge._id), challenge]);
+    setSelId(challenge._id);
+    setNewOpen(false);
+  };
 
   const toggle = async (item) => {
     setChallenge({
@@ -479,19 +534,25 @@ export default function Challenge() {
     }
   };
 
-  const restart = async () => {
-    if (!window.confirm(t('ch.confirmEnd'))) return;
-    await api.delete('/challenge');
-    setChallenge(null);
+  const end = async () => {
+    if (!window.confirm(t('ch.confirmEndOne', { title: c.title }))) return;
+    try {
+      await api.delete(`/challenge/${c._id}`);
+      setList((arr) => arr.filter((x) => x._id !== c._id));
+      setSelId(null);
+    } catch (err) {
+      toast(errMsg(err), 'error');
+    }
   };
 
+  const history = <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} onResumed={addChallenge} />;
 
   if (!data) return <Skeleton variant="rounded" height={320} />;
   if (!c) {
     return (
       <>
-        <StartForm onStarted={setChallenge} onHistory={() => setHistoryOpen(true)} />
-        <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
+        <StartForm onStarted={addChallenge} onHistory={() => setHistoryOpen(true)} />
+        {history}
       </>
     );
   }
@@ -501,11 +562,25 @@ export default function Challenge() {
   const actions = [
     { icon: <EditIcon />, label: t('ch.edit'), onClick: () => setEditOpen(true), hide: c.finished },
     { icon: <HistoryIcon />, label: t('ch.history'), onClick: () => setHistoryOpen(true) },
-    { icon: <RestartAltIcon />, label: t('ch.new'), onClick: restart },
+    { icon: <AddIcon />, label: t('ch.new'), onClick: () => setNewOpen(true) },
+    { icon: <StopCircleOutlinedIcon />, label: t('ch.end'), onClick: end },
   ].filter((a) => !a.hide);
 
   return (
     <Stack spacing={{ xs: 2, md: 3 }}>
+      {/* running challenges side by side: pick one to view / tick */}
+      {list.length > 1 && (
+        <Tabs value={c._id} onChange={(_, id) => setSelId(id)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile>
+          {list.map((x) => (
+            <Tab
+              key={x._id}
+              value={x._id}
+              label={`${x.title} · ${t('ch.dayShort')}${Math.min(x.today, x.days)}/${x.days}`}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            />
+          ))}
+        </Tabs>
+      )}
       {/* hero */}
       <Card sx={{ background: HERO_BG, color: '#fff', border: 0 }}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
@@ -592,7 +667,10 @@ export default function Challenge() {
       </Box>
 
       <EditDialog c={c} open={editOpen} onClose={() => setEditOpen(false)} onSaved={setChallenge} />
-      <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      {history}
+      <Dialog open={newOpen} onClose={() => setNewOpen(false)} fullWidth maxWidth="sm" slotProps={{ paper: { sx: { bgcolor: 'transparent', boxShadow: 'none', m: 1, width: 'calc(100% - 16px)' } } }}>
+        <StartForm onStarted={addChallenge} onCancel={() => setNewOpen(false)} />
+      </Dialog>
     </Stack>
   );
 }
