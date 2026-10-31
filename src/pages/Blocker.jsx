@@ -26,21 +26,16 @@ import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import { useT } from '../i18n';
 
-// name -> web address, Android package (for the StreakUp Android app's real lock) and avatar color
+// name -> web address and avatar color
 const APPS = [
-  { name: 'Instagram', url: 'https://www.instagram.com/', pkg: 'com.instagram.android', color: '#e1306c' },
-  { name: 'YouTube', url: 'https://www.youtube.com/', pkg: 'com.google.android.youtube', color: '#ef4444' },
-  { name: 'Facebook', url: 'https://www.facebook.com/', pkg: 'com.facebook.katana', color: '#3b82f6' },
-  { name: 'WhatsApp', url: 'https://web.whatsapp.com/', pkg: 'com.whatsapp', color: '#22c55e' },
-  { name: 'Snapchat', url: 'https://www.snapchat.com/', pkg: 'com.snapchat.android', color: '#eab308' },
-  { name: 'X', url: 'https://x.com/', pkg: 'com.twitter.android', color: '#64748b' },
+  { name: 'Instagram', url: 'https://www.instagram.com/', color: '#e1306c' },
+  { name: 'YouTube', url: 'https://www.youtube.com/', color: '#ef4444' },
+  { name: 'Facebook', url: 'https://www.facebook.com/', color: '#3b82f6' },
+  { name: 'WhatsApp', url: 'https://web.whatsapp.com/', color: '#22c55e' },
+  { name: 'Snapchat', url: 'https://www.snapchat.com/', color: '#eab308' },
+  { name: 'X', url: 'https://x.com/', color: '#64748b' },
 ];
 const QUICK = [1, 5, 10, 15, 30, 60];
-const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-// if the StreakUp Android app isn't installed, come back here (with a hint) instead of the Play Store
-const FALLBACK = encodeURIComponent(`${typeof location !== 'undefined' ? location.origin : ''}/blocker?needApp=1`);
-const phoneLink = (pkg, min) => `intent://blocker?app=${pkg}&min=${min}#Intent;scheme=streakup;package=app.streakup.blocker;S.browser_fallback_url=${FALLBACK};end`;
-const needApp = typeof location !== 'undefined' && new URLSearchParams(location.search).has('needApp');
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 const localDate = () => {
@@ -165,8 +160,6 @@ export default function Blocker() {
     const app = asking;
     update(app.name, { limit: min, usedMs: 0, runningSince: null });
     setAsking(null);
-    // on the StreakUp Android app this hands the limit to the real phone lock
-    if (isAndroid) window.location.href = phoneLink(app.pkg, min);
   };
 
   const start = (app, p) => {
@@ -174,7 +167,7 @@ export default function Blocker() {
     update(app.name, { ...p, runningSince: Date.now() });
     // the server pushes "time's up" even while the user is inside the other app
     api.post('/notifications/timer', { key: app.name, seconds: Math.ceil(left / 1000), title: t('bl.upTitle', { app: app.name }), body: t('bl.upBody', { app: app.name }) }).catch(() => {});
-    if (!isAndroid) window.open(app.url, '_blank', 'noopener');
+    window.open(app.url, '_blank', 'noopener');
   };
 
   const pause = (app, p) => {
@@ -191,8 +184,6 @@ export default function Blocker() {
           <Typography sx={{ opacity: 0.9 }}>{t('bl.sub')}</Typography>
         </CardContent>
       </Card>
-
-      {needApp && <Alert severity="warning">{t('bl.needApp')}</Alert>}
 
       <Card>
         <CardContent sx={{ p: { xs: 2, sm: 3 }, pb: { xs: 1, sm: 1.5 } }}>
