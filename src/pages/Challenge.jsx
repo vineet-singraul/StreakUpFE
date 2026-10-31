@@ -40,7 +40,7 @@ const SAMPLE = 'Wake up 5 AM\nWorkout 45 min\nNo junk food\nRead 10 pages\n3L wa
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 /* ---------- start form ---------- */
-function StartForm({ onStarted }) {
+function StartForm({ onStarted, onHistory }) {
   const t = useT();
   const toast = useToast();
   const [days, setDays] = useState('');
@@ -104,6 +104,7 @@ function StartForm({ onStarted }) {
             <Button variant="contained" size="large" startIcon={<EmojiEventsIcon />} onClick={start} disabled={busy} sx={{ flexGrow: 1 }}>
               {t('ch.start')}
             </Button>
+            <Button variant="outlined" size="large" startIcon={<HistoryIcon />} onClick={onHistory}>{t('ch.history')}</Button>
           </Stack>
         </Stack>
       </CardContent>
@@ -394,19 +395,23 @@ function ChallengeDetail({ id, onClose }) {
   );
 }
 
-function HistorySection() {
+/* Opened only from the History button: full-screen list of challenge boxes */
+function HistoryDialog({ open, onClose }) {
   const t = useT();
-  const { data } = useApi('/challenge/history');
+  const { data } = useApi(open ? '/challenge/history' : null);
   const [openId, setOpenId] = useState(null);
   // every challenge (running, completed, ended early); newest first from the API
   const list = data?.challenges || [];
 
   return (
-    <Box>
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
+    <Dialog open={open} onClose={onClose} fullScreen>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <HistoryIcon color="primary" />
-        <Typography variant="h6">{t('ch.historyTitle')}</Typography>
-      </Stack>
+        <Box component="span" sx={{ flexGrow: 1 }}>{t('ch.historyTitle')}</Box>
+        <IconButton edge="end" onClick={onClose} aria-label="Close"><CloseIcon /></IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 }, bgcolor: 'background.default' }}>
+      <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       {!data ? (
         <Skeleton variant="rounded" height={120} />
       ) : list.length === 0 ? (
@@ -440,8 +445,10 @@ function HistorySection() {
           ))}
         </Box>
       )}
+      </Box>
+      </DialogContent>
       <ChallengeDetail id={openId} onClose={() => setOpenId(null)} />
-    </Box>
+    </Dialog>
   );
 }
 
@@ -451,6 +458,7 @@ export default function Challenge() {
   const toast = useToast();
   const { data, setData } = useApi('/challenge');
   const [editOpen, setEditOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const c = data?.challenge;
 
   const setChallenge = (challenge) => setData((d) => ({ ...d, challenge }));
@@ -482,8 +490,8 @@ export default function Challenge() {
   if (!c) {
     return (
       <>
-        <StartForm onStarted={setChallenge} />
-        <Box sx={{ mt: 3 }}><HistorySection /></Box>
+        <StartForm onStarted={setChallenge} onHistory={() => setHistoryOpen(true)} />
+        <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
       </>
     );
   }
@@ -492,7 +500,7 @@ export default function Challenge() {
   const pct = Math.round((shownDay / c.days) * 100);
   const actions = [
     { icon: <EditIcon />, label: t('ch.edit'), onClick: () => setEditOpen(true), hide: c.finished },
-    { icon: <HistoryIcon />, label: t('ch.history'), onClick: () => document.getElementById('challenge-history')?.scrollIntoView({ behavior: 'smooth' }) },
+    { icon: <HistoryIcon />, label: t('ch.history'), onClick: () => setHistoryOpen(true) },
     { icon: <RestartAltIcon />, label: t('ch.new'), onClick: restart },
   ].filter((a) => !a.hide);
 
@@ -584,7 +592,7 @@ export default function Challenge() {
       </Box>
 
       <EditDialog c={c} open={editOpen} onClose={() => setEditOpen(false)} onSaved={setChallenge} />
-      <Box id="challenge-history"><HistorySection /></Box>
+      <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </Stack>
   );
 }
