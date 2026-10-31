@@ -36,6 +36,13 @@ const APPS = [
   { name: 'X', url: 'https://x.com/', color: '#64748b' },
 ];
 const QUICK = [1, 5, 10, 15, 30, 60];
+const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+// Opens the phone's Digital Wellbeing (where App timer lives). If the phone won't open it from the
+// browser, Chrome comes back to this page with the steps popup instead of the Play Store.
+const timerLink = (app, min) => {
+  const back = encodeURIComponent(`${window.location.origin}/blocker?lockHelp=${encodeURIComponent(`${app}:${min}`)}`);
+  return `intent://#Intent;package=com.google.android.apps.wellbeing;S.browser_fallback_url=${back};end`;
+};
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 const localDate = () => {
@@ -124,6 +131,11 @@ export default function Blocker() {
   const { user } = useAuth();
   const [plans, setPlans, readPlans] = usePlans(user?.email);
   const [asking, setAsking] = useState(null);
+  const [lockHelp, setLockHelp] = useState(() => {
+    const q = new URLSearchParams(window.location.search).get('lockHelp'); // back from a failed App timer open
+    const [app, min] = (q || '').split(':');
+    return app ? { app, min: Number(min) || 1 } : null;
+  });
   const [now, setNow] = useState(Date.now());
 
   const usedOf = (p) => p.usedMs + (p.runningSince ? now - p.runningSince : 0);
@@ -160,6 +172,8 @@ export default function Blocker() {
     const app = asking;
     update(app.name, { limit: min, usedMs: 0, runningSince: null });
     setAsking(null);
+    // the website can't close apps, so on Android walk the user to the phone's own App timer
+    if (isAndroid) setLockHelp({ app: app.name, min });
   };
 
   const start = (app, p) => {
@@ -238,9 +252,32 @@ export default function Blocker() {
       <Alert severity="info" icon={<LockIcon />}>
         <Typography sx={{ fontWeight: 700 }}>{t('bl.guideTitle')}</Typography>
         <Typography variant="body2">{t('bl.guide', { app: 'Instagram' })}</Typography>
+        {isAndroid && (
+          <Button variant="contained" size="small" startIcon={<LockIcon />} href={timerLink('Instagram', 5)} sx={{ mt: 1.5 }}>
+            {t('bl.openTimer')}
+          </Button>
+        )}
       </Alert>
 
       <MinutesDialog app={asking} onClose={() => setAsking(null)} onSave={saveLimit} />
+
+      {/* after a switch is turned on: one tap to the phone's App timer + the exact steps */}
+      <Dialog open={Boolean(lockHelp)} onClose={() => setLockHelp(null)} fullWidth maxWidth="xs">
+        <DialogTitle>🔒 {lockHelp && t('bl.lockTitle', { app: lockHelp.app })}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{t('bl.lockWhy')}</Typography>
+          <Box component="ol" sx={{ pl: 2.5, m: 0, '& li': { mb: 0.75 } }}>
+            <li>{t('bl.lockStep1')}</li>
+            <li>{lockHelp && t('bl.lockStep2', { app: lockHelp.app, min: lockHelp.min })}</li>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLockHelp(null)}>{t('bl.later')}</Button>
+          <Button variant="contained" startIcon={<LockIcon />} href={lockHelp ? timerLink(lockHelp.app, lockHelp.min) : undefined}>
+            {t('bl.openTimer')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
