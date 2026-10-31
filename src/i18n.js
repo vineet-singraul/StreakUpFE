@@ -83,6 +83,7 @@ const D = {
   'bl.stop': ['Pause', 'रोकें', 'Pause'],
   'bl.listTitle': ['Apps', 'ऐप्स', 'Apps'],
   'bl.listSub': ['Switch on an app and choose its minutes for today. Press Start when you open it.', 'ऐप का स्विच ऑन करें और आज के मिनट चुनें। ऐप खोलते समय Start दबाएँ।', 'App ka switch ON karo aur aaj ke minute chuno. App kholte waqt Start dabao.'],
+  'bl.needApp': ['The StreakUp Android app is not installed on this phone, so apps cannot be closed. Install the StreakUp APK, open it and turn the blocker on.', 'इस फ़ोन में StreakUp Android ऐप इंस्टॉल नहीं है, इसलिए ऐप बंद नहीं हो सकते। StreakUp APK इंस्टॉल करें, खोलें और ब्लॉकर ON करें।', 'Is phone me StreakUp Android app install nahi hai, isliye apps band nahi ho sakte. StreakUp APK install karo, kholo aur blocker ON karo.'],
   'bl.guideTitle': ['Make the lock unbreakable (free)', 'लॉक पक्का करें (फ्री)', 'Lock pakka karo (free)'],
   'bl.guide': ['Android: Settings → Digital Wellbeing → Dashboard → {app} → ⏳ App timer → same minutes. iPhone: Settings → Screen Time → App Limits → {app}. Then the phone itself closes {app} when time is up.', 'Android: Settings → Digital Wellbeing → Dashboard → {app} → ⏳ App timer → वही मिनट। iPhone: Settings → Screen Time → App Limits → {app}। फिर फ़ोन खुद {app} बंद कर देगा।', 'Android: Settings → Digital Wellbeing → Dashboard → {app} → ⏳ App timer → wahi minute. iPhone: Settings → Screen Time → App Limits → {app}. Phir phone khud {app} band kar dega.'],
   'nav.settings': ['Settings', 'सेटिंग्स', 'Settings'],

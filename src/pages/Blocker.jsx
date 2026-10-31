@@ -37,7 +37,10 @@ const APPS = [
 ];
 const QUICK = [1, 5, 10, 15, 30, 60];
 const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-const phoneLink = (pkg, min) => `intent://blocker?app=${pkg}&min=${min}#Intent;scheme=streakup;package=app.streakup.blocker;end`;
+// if the StreakUp Android app isn't installed, come back here (with a hint) instead of the Play Store
+const FALLBACK = encodeURIComponent(`${typeof location !== 'undefined' ? location.origin : ''}/blocker?needApp=1`);
+const phoneLink = (pkg, min) => `intent://blocker?app=${pkg}&min=${min}#Intent;scheme=streakup;package=app.streakup.blocker;S.browser_fallback_url=${FALLBACK};end`;
+const needApp = typeof location !== 'undefined' && new URLSearchParams(location.search).has('needApp');
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 const localDate = () => {
@@ -188,6 +191,8 @@ export default function Blocker() {
           <Typography sx={{ opacity: 0.9 }}>{t('bl.sub')}</Typography>
         </CardContent>
       </Card>
+
+      {needApp && <Alert severity="warning">{t('bl.needApp')}</Alert>}
 
       <Card>
         <CardContent sx={{ p: { xs: 2, sm: 3 }, pb: { xs: 1, sm: 1.5 } }}>
