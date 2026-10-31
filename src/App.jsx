@@ -13,6 +13,7 @@ const DayView = lazy(() => import('./pages/DayView'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
+const Blocker = lazy(() => import('./pages/Blocker'));
 
 const FullScreenLoader = () => (
   <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/day/:date" element={page(<DayView />)} />
         <Route path="/reports" element={page(<Reports />)} />
         <Route path="/challenge" element={page(<Challenge />)} />
+        <Route path="/blocker" element={page(<Blocker />)} />
         <Route path="/settings" element={page(<Settings />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

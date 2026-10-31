@@ -21,6 +21,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import LogoutIcon from '@mui/icons-material/Logout';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import BlockIcon from '@mui/icons-material/Block';
 import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
 import NotifyBanner from './NotifyBanner';
@@ -41,6 +42,7 @@ const NAV = [
   { label: 'nav.today', path: '/day/today', icon: <TodayIcon /> },
   { label: 'nav.reports', path: '/reports', icon: <InsightsIcon /> },
   { label: 'nav.challenge', path: '/challenge', icon: <EmojiEventsIcon /> },
+  { label: 'nav.blocker', path: '/blocker', icon: <BlockIcon /> },
   { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
