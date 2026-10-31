@@ -15,9 +15,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import List from '@mui/material/List';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemText from '@mui/material/ListItemText';
 import ButtonBase from '@mui/material/ButtonBase';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme, alpha } from '@mui/material/styles';
@@ -29,7 +26,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import StarIcon from '@mui/icons-material/Star';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
@@ -44,17 +40,25 @@ const SAMPLE = 'Wake up 5 AM\nWorkout 45 min\nNo junk food\nRead 10 pages\n3L wa
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 /* ---------- start form ---------- */
-function StartForm({ onStarted, onHistory }) {
+function StartForm({ onStarted }) {
   const t = useT();
   const toast = useToast();
-  const [title, setTitle] = useState('30 Day Hard Challenge');
+  const [days, setDays] = useState('');
+  const [title, setTitle] = useState('');
   const [rules, setRules] = useState(SAMPLE);
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState(false);
+
+  const daysNum = Number(days);
+  const daysError = !Number.isInteger(daysNum) || daysNum < 10 || daysNum > 90;
+  const titleError = !title.trim();
 
   const start = async () => {
+    setTouched(true);
+    if (daysError || titleError) return;
     setBusy(true);
     try {
-      const { data } = await api.post('/challenge', { title, items: rules.split('\n') });
+      const { data } = await api.post('/challenge', { days: daysNum, title: title.trim(), items: rules.split('\n') });
       onStarted(data.challenge);
       toast(t('ch.started'));
     } catch (err) {
@@ -73,13 +77,33 @@ function StartForm({ onStarted, onHistory }) {
       </Box>
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>
-          <TextField label={t('ch.name')} value={title} onChange={(e) => setTitle(e.target.value)} fullWidth />
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <TextField
+              label={t('ch.days')}
+              type="number"
+              required
+              value={days}
+              onChange={(e) => setDays(e.target.value)}
+              error={touched && daysError}
+              helperText={touched && daysError ? t('ch.daysError') : t('ch.daysHelp')}
+              slotProps={{ htmlInput: { min: 10, max: 90, inputMode: 'numeric' } }}
+              sx={{ width: { xs: '100%', sm: 180 }, flexShrink: 0 }}
+            />
+            <TextField
+              label={t('ch.name')}
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              error={touched && titleError}
+              helperText={touched && titleError ? t('ch.titleError') : ' '}
+              fullWidth
+            />
+          </Stack>
           <TextField label={t('ch.rules')} helperText={t('ch.rulesHelp')} value={rules} onChange={(e) => setRules(e.target.value)} multiline minRows={6} fullWidth />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
             <Button variant="contained" size="large" startIcon={<EmojiEventsIcon />} onClick={start} disabled={busy} sx={{ flexGrow: 1 }}>
               {t('ch.start')}
             </Button>
-            <Button variant="outlined" size="large" startIcon={<HistoryIcon />} onClick={onHistory}>{t('ch.history')}</Button>
           </Stack>
         </Stack>
       </CardContent>
@@ -184,7 +208,9 @@ export function ChallengeLineChart({ c }) {
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.day)},${y(p.pct)}`).join(' ');
   const area = pts.length ? `${line} L${x(pts.at(-1).day)},${y(0)} L${x(1)},${y(0)} Z` : '';
   const avg = pts.length ? Math.round(pts.reduce((s, p) => s + p.pct, 0) / pts.length) : 0;
-  const step = innerW / Math.max(c.days - 1, 1) < 40 ? 5 : 1; // keep D-labels from colliding
+  // smallest label step whose labels are >= 40px apart (works from 10 to 90 days)
+  const gap = innerW / Math.max(c.days - 1, 1);
+  const step = [1, 5, 10, 15, 30].find((s) => s * gap >= 40) || 30;
   const hp = hover ? pts[hover - 1] : null;
 
   const onMove = (e) => {
@@ -329,69 +355,93 @@ function EditDialog({ c, open, onClose, onSaved }) {
   );
 }
 
-/* ---------- history dialog: list by title -> click shows that table ---------- */
-function HistoryDialog({ open, onClose }) {
+/* ---------- history: a box per challenge (finished ones first) -> full-screen popup ---------- */
+function ChallengeDetail({ id, onClose }) {
   const t = useT();
-  const fullScreen = useMediaQuery(useTheme().breakpoints.down('md'));
-  const { data } = useApi(open ? '/challenge/history' : null);
-  const [selectedId, setSelectedId] = useState(null);
-  const { data: detail } = useApi(selectedId ? `/challenge/${selectedId}` : null);
-  const sel = detail?.challenge;
-
-  useEffect(() => {
-    if (!open) setSelectedId(null);
-  }, [open]);
-
+  const { data } = useApi(id ? `/challenge/${id}` : null);
+  const sel = data?.challenge;
   return (
-    <Dialog open={open} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="lg">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {selectedId && (
-          <IconButton edge="start" onClick={() => setSelectedId(null)} aria-label={t('ch.back')}><ArrowBackIcon /></IconButton>
-        )}
-        <HistoryIcon color="primary" />
+    <Dialog open={Boolean(id)} onClose={onClose} fullScreen>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, background: HERO_BG, color: '#fff' }}>
+        <EmojiEventsIcon />
         <Box component="span" sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {selectedId ? sel?.title || '…' : t('ch.historyTitle')}
+          {sel?.title || '…'}
         </Box>
-        <IconButton edge="end" onClick={onClose}><CloseIcon /></IconButton>
+        <IconButton edge="end" onClick={onClose} aria-label="Close" sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,.15)' }}>
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
-      <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 } }}>
-        {!selectedId ? (
-          !data ? (
-            <Skeleton variant="rounded" height={200} />
-          ) : data.challenges.length === 0 ? (
-            <Typography color="text.secondary" sx={{ textAlign: 'center', py: 6 }}>{t('ch.historyEmpty')}</Typography>
-          ) : (
-            <List disablePadding>
-              {data.challenges.map((h) => (
-                <ListItemButton key={h._id} onClick={() => setSelectedId(h._id)} divider sx={{ borderRadius: 2, gap: 2 }}>
-                  <EmojiEventsIcon color={h.finished ? 'warning' : 'disabled'} />
-                  <ListItemText
-                    primary={h.title}
-                    secondary={`${prettyDate(h.startDate)} · ${t('ch.day')} ${h.dayReached}/${h.days} · ${h.rules} ${t('ch.rulesCount')}`}
-                    slotProps={{ primary: { fontWeight: 600, noWrap: true } }}
-                  />
-                  <Stack sx={{ alignItems: 'flex-end', flexShrink: 0 }} spacing={0.5}>
-                    <Chip size="small" icon={<StarIcon />} label={h.points} color="warning" variant="outlined" />
-                    <Chip size="small" label={h.active ? t('ch.active') : h.finished ? t('ch.completed') : t('ch.ended')} color={h.active ? 'primary' : h.finished ? 'success' : 'default'} />
-                  </Stack>
-                </ListItemButton>
-              ))}
-            </List>
-          )
-        ) : !sel ? (
-          <Skeleton variant="rounded" height={300} />
+      <DialogContent sx={{ p: { xs: 1.5, sm: 3 }, bgcolor: 'background.default' }}>
+        {!sel ? (
+          <Skeleton variant="rounded" height={300} sx={{ mt: 2 }} />
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={{ xs: 2, md: 3 }} sx={{ pt: 2, maxWidth: 1400, mx: 'auto' }}>
             <Typography variant="body2" color="text.secondary">
               {prettyDate(sel.startDate)}{sel.endedAt ? ` → ${prettyDate(sel.endedAt)}` : ''}
             </Typography>
             <Stats c={sel} />
             <ChallengeLineChart c={sel} />
-            <ChallengeGrid c={sel} />
+            <Card sx={{ minWidth: 0 }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 1.5 }}>{t('ch.grid', { n: sel.days })}</Typography>
+                <ChallengeGrid c={sel} />
+              </CardContent>
+            </Card>
           </Stack>
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function HistorySection() {
+  const t = useT();
+  const { data } = useApi('/challenge/history');
+  const [openId, setOpenId] = useState(null);
+  // only challenges that ran all their days show up in History
+  const list = (data?.challenges || []).filter((h) => h.finished);
+
+  return (
+    <Box>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
+        <HistoryIcon color="primary" />
+        <Typography variant="h6">{t('ch.historyTitle')}</Typography>
+      </Stack>
+      {!data ? (
+        <Skeleton variant="rounded" height={120} />
+      ) : list.length === 0 ? (
+        <Card><CardContent><Typography color="text.secondary">{t('ch.historyEmpty')}</Typography></CardContent></Card>
+      ) : (
+        <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)' } }}>
+          {list.map((h) => (
+            <Card key={h._id} sx={{ overflow: 'hidden' }}>
+              <ButtonBase onClick={() => setOpenId(h._id)} sx={{ display: 'block', width: '100%', textAlign: 'left' }}>
+                <Box sx={{ height: 6, background: h.finished ? HERO_BG : 'var(--mui-palette-divider)' }} />
+                <CardContent>
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
+                    <EmojiEventsIcon color={h.finished ? 'warning' : 'disabled'} />
+                    <Box sx={{ minWidth: 0, flexGrow: 1 }}>
+                      <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.4, display: 'block' }}>{t('ch.nDay', { n: h.days })}</Typography>
+                      <Typography variant="subtitle1" noWrap sx={{ fontWeight: 700 }}>{h.title}</Typography>
+                    </Box>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                    {prettyDate(h.startDate)} · {t('ch.day')} {h.dayReached}/{h.days} · {h.rules} {t('ch.rulesCount')}
+                  </Typography>
+                  <LinearProgress variant="determinate" value={(h.dayReached / h.days) * 100} color={h.finished ? 'success' : 'inherit'} sx={{ height: 6, borderRadius: 3, mb: 1.5 }} />
+                  <Stack direction="row" spacing={1}>
+                    <Chip size="small" icon={<StarIcon />} label={h.points} color="warning" variant="outlined" />
+                    <Chip size="small" icon={<WorkspacePremiumIcon />} label={h.perfectDays} variant="outlined" />
+                    <Chip size="small" label={h.finished ? t('ch.completed') : t('ch.ended')} color={h.finished ? 'success' : 'default'} />
+                  </Stack>
+                </CardContent>
+              </ButtonBase>
+            </Card>
+          ))}
+        </Box>
+      )}
+      <ChallengeDetail id={openId} onClose={() => setOpenId(null)} />
+    </Box>
   );
 }
 
@@ -401,7 +451,6 @@ export default function Challenge() {
   const toast = useToast();
   const { data, setData } = useApi('/challenge');
   const [editOpen, setEditOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const c = data?.challenge;
 
   const setChallenge = (challenge) => setData((d) => ({ ...d, challenge }));
@@ -428,14 +477,13 @@ export default function Challenge() {
     setChallenge(null);
   };
 
-  const history = <HistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />;
 
   if (!data) return <Skeleton variant="rounded" height={320} />;
   if (!c) {
     return (
       <>
-        <StartForm onStarted={setChallenge} onHistory={() => setHistoryOpen(true)} />
-        {history}
+        <StartForm onStarted={setChallenge} />
+        <Box sx={{ mt: 3 }}><HistorySection /></Box>
       </>
     );
   }
@@ -444,7 +492,7 @@ export default function Challenge() {
   const pct = Math.round((shownDay / c.days) * 100);
   const actions = [
     { icon: <EditIcon />, label: t('ch.edit'), onClick: () => setEditOpen(true), hide: c.finished },
-    { icon: <HistoryIcon />, label: t('ch.history'), onClick: () => setHistoryOpen(true) },
+    { icon: <HistoryIcon />, label: t('ch.history'), onClick: () => document.getElementById('challenge-history')?.scrollIntoView({ behavior: 'smooth' }) },
     { icon: <RestartAltIcon />, label: t('ch.new'), onClick: restart },
   ].filter((a) => !a.hide);
 
@@ -528,7 +576,7 @@ export default function Challenge() {
 
         <Card sx={{ minWidth: 0, gridColumn: c.finished ? '1 / -1' : 'auto' }}>
           <CardContent>
-            <Typography variant="h6" sx={{ mb: 1.5 }}>{t('ch.grid')}</Typography>
+            <Typography variant="h6" sx={{ mb: 1.5 }}>{t('ch.grid', { n: c.days })}</Typography>
             <ChallengeGrid c={c} onToggle={c.finished ? undefined : toggle} />
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>{t('ch.hint')}</Typography>
           </CardContent>
@@ -536,7 +584,7 @@ export default function Challenge() {
       </Box>
 
       <EditDialog c={c} open={editOpen} onClose={() => setEditOpen(false)} onSaved={setChallenge} />
-      {history}
+      <Box id="challenge-history"><HistorySection /></Box>
     </Stack>
   );
 }
