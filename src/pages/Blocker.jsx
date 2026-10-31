@@ -28,20 +28,22 @@ import { useT } from '../i18n';
 
 // name -> web address and avatar color
 const APPS = [
-  { name: 'Instagram', url: 'https://www.instagram.com/', color: '#e1306c' },
-  { name: 'YouTube', url: 'https://www.youtube.com/', color: '#ef4444' },
-  { name: 'Facebook', url: 'https://www.facebook.com/', color: '#3b82f6' },
-  { name: 'WhatsApp', url: 'https://web.whatsapp.com/', color: '#22c55e' },
-  { name: 'Snapchat', url: 'https://www.snapchat.com/', color: '#eab308' },
-  { name: 'X', url: 'https://x.com/', color: '#64748b' },
+  { name: 'Instagram', pkg: 'com.instagram.android', url: 'https://www.instagram.com/', color: '#e1306c' },
+  { name: 'YouTube', pkg: 'com.google.android.youtube', url: 'https://www.youtube.com/', color: '#ef4444' },
+  { name: 'Facebook', pkg: 'com.facebook.katana', url: 'https://www.facebook.com/', color: '#3b82f6' },
+  { name: 'WhatsApp', pkg: 'com.whatsapp', url: 'https://web.whatsapp.com/', color: '#22c55e' },
+  { name: 'Snapchat', pkg: 'com.snapchat.android', url: 'https://www.snapchat.com/', color: '#eab308' },
+  { name: 'X', pkg: 'com.twitter.android', url: 'https://x.com/', color: '#64748b' },
 ];
 const QUICK = [1, 5, 10, 15, 30, 60];
 const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-// Opens the phone's Digital Wellbeing (where App timer lives). If the phone won't open it from the
-// browser, Chrome comes back to this page with the steps popup instead of the Play Store.
+// Opens the phone's usage page for that one app (Digital Wellbeing → app → App timer) via Android's
+// APP_USAGE_SETTINGS screen. If the phone won't open it from the browser, Chrome comes back to this
+// page with the steps popup instead of the Play Store.
 const timerLink = (app, min) => {
+  const pkg = APPS.find((a) => a.name === app)?.pkg || '';
   const back = encodeURIComponent(`${window.location.origin}/blocker?lockHelp=${encodeURIComponent(`${app}:${min}`)}`);
-  return `intent://#Intent;package=com.google.android.apps.wellbeing;S.browser_fallback_url=${back};end`;
+  return `intent:#Intent;action=android.settings.action.APP_USAGE_SETTINGS;S.android.intent.extra.PACKAGE_NAME=${pkg};S.browser_fallback_url=${back};end`;
 };
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
