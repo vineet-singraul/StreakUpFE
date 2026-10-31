@@ -398,8 +398,8 @@ function HistorySection() {
   const t = useT();
   const { data } = useApi('/challenge/history');
   const [openId, setOpenId] = useState(null);
-  // only challenges that ran all their days show up in History
-  const list = (data?.challenges || []).filter((h) => h.finished);
+  // every challenge (running, completed, ended early); newest first from the API
+  const list = data?.challenges || [];
 
   return (
     <Box>
@@ -432,7 +432,7 @@ function HistorySection() {
                   <Stack direction="row" spacing={1}>
                     <Chip size="small" icon={<StarIcon />} label={h.points} color="warning" variant="outlined" />
                     <Chip size="small" icon={<WorkspacePremiumIcon />} label={h.perfectDays} variant="outlined" />
-                    <Chip size="small" label={h.finished ? t('ch.completed') : t('ch.ended')} color={h.finished ? 'success' : 'default'} />
+                    <Chip size="small" label={h.finished ? t('ch.completed') : h.active ? t('ch.active') : t('ch.ended')} color={h.finished ? 'success' : h.active ? 'primary' : 'default'} />
                   </Stack>
                 </CardContent>
               </ButtonBase>
