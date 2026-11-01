@@ -29,7 +29,12 @@ export default function Login() {
   const t = useT();
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin');
-  const [error, setError] = useState('');
+  // Set by api.js when the admin has blocked this account
+  const [error, setError] = useState(() => {
+    const msg = sessionStorage.getItem('ht_blocked') || '';
+    sessionStorage.removeItem('ht_blocked');
+    return msg;
+  });
   const [busy, setBusy] = useState(false);
   const clientMissing = !import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID.startsWith('PASTE_');
 

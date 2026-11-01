@@ -24,6 +24,20 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemText from '@mui/material/ListItemText';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import CircularProgress from '@mui/material/CircularProgress';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import BlockIcon from '@mui/icons-material/Block';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+import ChecklistIcon from '@mui/icons-material/Checklist';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import CloseIcon from '@mui/icons-material/Close';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
@@ -105,6 +119,7 @@ function Overview({ users, onOpenUser }) {
   const activeToday = users.filter((u) => u.lastLoginAt && now - new Date(u.lastLoginAt) < DAY).length;
   const newThisWeek = users.filter((u) => now - new Date(u.createdAt) < 7 * DAY).length;
   const withLocation = users.filter((u) => u.lastLocation).length;
+  const blocked = users.filter((u) => u.blocked).length;
   const recentLogins = users.filter((u) => u.lastLoginAt).slice(0, 6);
   const recentSignups = [...users].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
 
@@ -125,11 +140,12 @@ function Overview({ users, onOpenUser }) {
 
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' } }}>
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' } }}>
         <StatCard icon={<PeopleIcon />} label="Total users" value={users.length} color="primary" />
         <StatCard icon={<LoginIcon />} label="Active (24 hr)" value={activeToday} color="success" />
         <StatCard icon={<PersonAddIcon />} label="New this week" value={newThisWeek} color="secondary" />
         <StatCard icon={<MyLocationIcon />} label="Location shared" value={withLocation} color="warning" />
+        <StatCard icon={<BlockIcon />} label="Blocked" value={blocked} color="error" />
       </Box>
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
@@ -151,21 +167,25 @@ function Overview({ users, onOpenUser }) {
 
 // ---------- Section 2: Users ----------
 
-function UserCard({ user, onOpen }) {
+function UserCard({ user, onOpen, onTasks, onToggleBlock }) {
   const stats = [
     ['Habits', user.habits],
     ['Tasks', user.tasks],
     ['Challenges', user.challenges],
   ];
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, display: 'flex', flexDirection: 'column' }}>
+    <Card
+      variant="outlined"
+      sx={{ borderRadius: 3, display: 'flex', flexDirection: 'column', borderColor: user.blocked ? 'error.main' : 'divider' }}
+    >
       <CardContent sx={{ flexGrow: 1 }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 1.5 }}>
           <UserAvatar user={user} size={52} />
-          <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ minWidth: 0, flexGrow: 1 }}>
             <Typography sx={{ fontWeight: 700 }} noWrap>{user.name}</Typography>
             <Typography variant="body2" color="text.secondary" noWrap>{user.email}</Typography>
           </Box>
+          {user.blocked && <Chip size="small" color="error" icon={<BlockIcon />} label="Blocked" />}
         </Stack>
 
         <Stack direction="row" spacing={0.75} sx={{ flexWrap: 'wrap', gap: 0.75, mb: 1.5 }} useFlexGap>
@@ -191,19 +211,24 @@ function UserCard({ user, onOpen }) {
           Joined {fmtDate(user.createdAt)} · Last login {timeAgo(user.lastLoginAt)}
         </Typography>
       </CardContent>
-      {user.lastLocation && (
-        <>
-          <Divider />
-          <Button onClick={() => onOpen(user)} startIcon={<PlaceIcon />} sx={{ borderRadius: 0, py: 1 }}>
-            View location
-          </Button>
-        </>
-      )}
+      <Divider />
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', '& .MuiButton-root': { borderRadius: 0, py: 1 } }}>
+        <Button size="small" startIcon={<ChecklistIcon />} onClick={() => onTasks(user)}>Tasks</Button>
+        <Button size="small" startIcon={<PlaceIcon />} onClick={() => onOpen(user)} disabled={!user.lastLocation}>Location</Button>
+        <Button
+          size="small"
+          color={user.blocked ? 'success' : 'error'}
+          startIcon={user.blocked ? <LockOpenIcon /> : <BlockIcon />}
+          onClick={() => onToggleBlock(user)}
+        >
+          {user.blocked ? 'Unblock' : 'Block'}
+        </Button>
+      </Box>
     </Card>
   );
 }
 
-function Users({ users, onOpenUser }) {
+function Users({ users, onOpenUser, onTasks, onToggleBlock }) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -221,7 +246,9 @@ function Users({ users, onOpenUser }) {
         sx={{ maxWidth: 420 }}
       />
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)' } }}>
-        {shown.map((u) => <UserCard key={u.id} user={u} onOpen={onOpenUser} />)}
+        {shown.map((u) => (
+          <UserCard key={u.id} user={u} onOpen={onOpenUser} onTasks={onTasks} onToggleBlock={onToggleBlock} />
+        ))}
       </Box>
       {!shown.length && <Typography color="text.secondary">No users found</Typography>}
     </Stack>
@@ -314,6 +341,134 @@ function Locations({ users, selectedId, onSelect }) {
   );
 }
 
+// ---------- Dialogs ----------
+
+const prettyDay = (ymd) =>
+  new Date(`${ymd}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+/** All tasks of one user, grouped by day, each deletable. */
+function TasksDialog({ user, onClose, onDeleted, confirm }) {
+  const fullScreen = useMediaQuery((theme) => theme.breakpoints.down('sm'));
+  const [tasks, setTasks] = useState(null);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(null);
+
+  useEffect(() => {
+    api
+      .get(`/admin/users/${user.id}/tasks`)
+      .then((res) => setTasks(res.data.tasks))
+      .catch((err) => setError(errMsg(err)));
+  }, [user.id]);
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const t of tasks || []) map.set(t.date, [...(map.get(t.date) || []), t]);
+    return [...map];
+  }, [tasks]);
+  const doneCount = tasks?.filter((t) => t.done).length || 0;
+
+  const remove = (task) =>
+    confirm({
+      title: 'Task delete karein?',
+      text: `"${task.title}" (${prettyDay(task.date)}) hamesha ke liye delete ho jayega.`,
+      action: 'Delete',
+      onConfirm: async () => {
+        setDeleting(task.id);
+        try {
+          await api.delete(`/admin/tasks/${task.id}`);
+          setTasks((list) => list.filter((t) => t.id !== task.id));
+          onDeleted(user.id);
+        } catch (err) {
+          setError(errMsg(err));
+        } finally {
+          setDeleting(null);
+        }
+      },
+    });
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm" fullScreen={fullScreen}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pr: 7 }}>
+        <UserAvatar user={user} />
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700 }} noWrap>{user.name} ke tasks</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {tasks ? `${tasks.length} tasks · ${doneCount} done` : 'Loading…'}
+          </Typography>
+        </Box>
+        <IconButton onClick={onClose} aria-label="Close" sx={{ position: 'absolute', right: 12, top: 14 }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: 0 }}>
+        {error && <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>}
+        {!tasks && !error && (
+          <Box sx={{ display: 'grid', placeItems: 'center', py: 6 }}><CircularProgress /></Box>
+        )}
+        {tasks && !tasks.length && (
+          <Typography color="text.secondary" sx={{ textAlign: 'center', py: 6 }}>Is user ka koi task nahi hai</Typography>
+        )}
+        {groups.map(([date, list]) => (
+          <Box key={date}>
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{ display: 'block', px: 2, py: 0.5, bgcolor: 'action.hover', position: 'sticky', top: 0, zIndex: 1 }}
+            >
+              {prettyDay(date)} · {list.filter((t) => t.done).length}/{list.length} done
+            </Typography>
+            <List dense disablePadding>
+              {list.map((t) => (
+                <Box key={t.id} sx={{ display: 'flex', alignItems: 'center', px: 2, py: 0.75, gap: 1.5 }}>
+                  {t.done ? <CheckCircleIcon color="success" fontSize="small" /> : <RadioButtonUncheckedIcon color="disabled" fontSize="small" />}
+                  <Typography
+                    variant="body2"
+                    sx={{ flexGrow: 1, minWidth: 0, wordBreak: 'break-word', color: t.done ? 'text.secondary' : 'text.primary', textDecoration: t.done ? 'line-through' : 'none' }}
+                  >
+                    {t.title}
+                  </Typography>
+                  <Tooltip title="Delete task">
+                    <span>
+                      <IconButton size="small" color="error" onClick={() => remove(t)} disabled={deleting === t.id}>
+                        {deleting === t.id ? <CircularProgress size={18} /> : <DeleteOutlineIcon fontSize="small" />}
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
+              ))}
+            </List>
+          </Box>
+        ))}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ConfirmDialog({ request, onClose }) {
+  const [busy, setBusy] = useState(false);
+  if (!request) return null;
+  const run = async () => {
+    setBusy(true);
+    await request.onConfirm();
+    setBusy(false);
+    onClose();
+  };
+  return (
+    <Dialog open onClose={busy ? undefined : onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>{request.title}</DialogTitle>
+      <DialogContent>
+        <DialogContentText>{request.text}</DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={busy}>Cancel</Button>
+        <Button variant="contained" color={request.color || 'error'} onClick={run} disabled={busy}>
+          {busy ? <CircularProgress size={20} color="inherit" /> : request.action}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 // ---------- Page ----------
 
 const SECTIONS = [
@@ -343,10 +498,35 @@ export default function Admin() {
 
   useEffect(load, [load]);
 
+  const [tasksUser, setTasksUser] = useState(null);
+  const [confirmReq, setConfirmReq] = useState(null);
+
   const openLocation = (u) => {
     setSelectedId(u.id);
     setTab(2);
   };
+
+  const patchUser = (id, changes) => setUsers((list) => list.map((u) => (u.id === id ? { ...u, ...changes } : u)));
+
+  const toggleBlock = (u) =>
+    setConfirmReq({
+      title: u.blocked ? `${u.name} ko unblock karein?` : `${u.name} ko block karein?`,
+      text: u.blocked
+        ? 'User phir se login karke app use kar payega.'
+        : 'User turant logout ho jayega, dobara login nahi kar payega aur use reminders/reports bhi nahi jayenge. Data delete nahi hoga.',
+      action: u.blocked ? 'Unblock' : 'Block',
+      color: u.blocked ? 'success' : 'error',
+      onConfirm: async () => {
+        try {
+          const { data } = await api.patch(`/admin/users/${u.id}/block`, { blocked: !u.blocked });
+          patchUser(u.id, data);
+        } catch (err) {
+          setError(errMsg(err));
+        }
+      },
+    });
+
+  const onTaskDeleted = (id) => setUsers((list) => list.map((u) => (u.id === id ? { ...u, tasks: Math.max(0, u.tasks - 1) } : u)));
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -382,11 +562,16 @@ export default function Admin() {
         ) : (
           <>
             {tab === 0 && <Overview users={users} onOpenUser={(u) => (u.lastLocation ? openLocation(u) : setTab(1))} />}
-            {tab === 1 && <Users users={users} onOpenUser={openLocation} />}
+            {tab === 1 && <Users users={users} onOpenUser={openLocation} onTasks={setTasksUser} onToggleBlock={toggleBlock} />}
             {tab === 2 && <Locations users={users} selectedId={selectedId} onSelect={setSelectedId} />}
           </>
         )}
       </Container>
+
+      {tasksUser && (
+        <TasksDialog user={tasksUser} onClose={() => setTasksUser(null)} onDeleted={onTaskDeleted} confirm={setConfirmReq} />
+      )}
+      <ConfirmDialog request={confirmReq} onClose={() => setConfirmReq(null)} />
     </Box>
   );
 }

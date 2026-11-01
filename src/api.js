@@ -34,6 +34,13 @@ api.interceptors.response.use(
     if (isWakingUp(err)) {
       err.message = 'Server abhi start ho raha hai, 1 minute baad dobara try karo';
     }
+    const blocked = err.response?.status === 403 && err.response.data?.blocked;
+    if (blocked && !cfg?.url?.includes('/auth/google')) {
+      // Admin blocked this account: sign out and explain on the login page
+      localStorage.removeItem(TOKEN_KEY);
+      sessionStorage.setItem('ht_blocked', err.response.data.message);
+      if (window.location.pathname !== '/login') window.location.href = '/login';
+    }
     if (err.response?.status === 401 && !cfg?.url?.includes('/auth/google')) {
       localStorage.removeItem(TOKEN_KEY);
       if (window.location.pathname !== '/login') window.location.href = '/login';
