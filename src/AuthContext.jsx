@@ -5,6 +5,25 @@ import { clearCache } from './cache';
 const USER_KEY = 'ht_user';
 const AuthContext = createContext(null);
 
+// Asks the browser for latitude/longitude and stores it on the user. Never blocks or breaks login.
+function saveLocation(onSaved) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      api
+        .post('/auth/location', {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+        })
+        .then((res) => onSaved(res.data.user))
+        .catch(() => {});
+    },
+    () => {}, // permission denied / unavailable: ignore
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 5 * 60 * 1000 },
+  );
+}
+
 function readCachedUser() {
   try {
     return localStorage.getItem(TOKEN_KEY) ? JSON.parse(localStorage.getItem(USER_KEY)) : null;
@@ -34,7 +53,11 @@ export function AuthProvider({ children }) {
     if (!localStorage.getItem(TOKEN_KEY)) return;
     api
       .get('/auth/me')
-      .then((res) => setUser(res.data.user))
+      .then((res) => {
+        setUser(res.data.user);
+        // Already logged-in users (saved token) don't go through login again, so capture here too
+        saveLocation(setUser);
+      })
       .catch((err) => {
         if (err.response?.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
@@ -49,6 +72,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem(TOKEN_KEY, data.token);
     clearCache();
     setUser(data.user);
+    saveLocation(setUser);
     return data;
   }, [setUser]);
 

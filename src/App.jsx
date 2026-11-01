@@ -13,6 +13,7 @@ const DayView = lazy(() => import('./pages/DayView'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
+const Admin = lazy(() => import('./pages/Admin'));
 
 const FullScreenLoader = () => (
   <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
@@ -23,7 +24,16 @@ const FullScreenLoader = () => (
 function Protected({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <FullScreenLoader />;
-  return user ? children : <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  // The admin account only ever sees the admin panel
+  return user.isAdmin ? <Navigate to="/admin" replace /> : children;
+}
+
+function AdminOnly({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <FullScreenLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+  return user.isAdmin ? <Suspense fallback={<FullScreenLoader />}>{children}</Suspense> : <Navigate to="/" replace />;
 }
 
 const page = (el) => <Suspense fallback={<LinearProgress />}>{el}</Suspense>;
@@ -34,8 +44,9 @@ export default function App() {
     <Routes>
       <Route
         path="/login"
-        element={user ? <Navigate to="/" replace /> : <Suspense fallback={<FullScreenLoader />}><Login /></Suspense>}
+        element={user ? <Navigate to={user.isAdmin ? '/admin' : '/'} replace /> : <Suspense fallback={<FullScreenLoader />}><Login /></Suspense>}
       />
+      <Route path="/admin" element={<AdminOnly><Admin /></AdminOnly>} />
       <Route
         element={
           <Protected>
