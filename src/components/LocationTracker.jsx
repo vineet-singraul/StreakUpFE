@@ -9,6 +9,8 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
 import Avatar from '@mui/material/Avatar';
 import Skeleton from '@mui/material/Skeleton';
@@ -25,6 +27,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import CircularProgress from '@mui/material/CircularProgress';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
 import api, { errMsg } from '../api';
 
 const POLL_MS = 30_000;
@@ -44,11 +47,16 @@ function Stat({ label, value }) {
   );
 }
 
-/** Leaflet + OpenStreetMap. IP locations are approximate (city level), shown as orange dashed circles. */
-function LocationMap({ users, onSelect }) {
+/**
+ * Leaflet + OpenStreetMap. IP locations are approximate (city level), shown as orange dashed circles.
+ * `focus` = { userId, n } : whenever it changes, the map zooms to that user and opens their popup,
+ * so the admin can "locate" a single user's current (IP-based) location on the live map.
+ */
+function LocationMap({ users, onSelect, focus }) {
   const el = useRef(null);
   const map = useRef(null);
   const layer = useRef(null);
+  const markers = useRef(new Map()); // userId -> Leaflet marker
   const fitted = useRef(false);
 
   useEffect(() => {
@@ -64,14 +72,16 @@ function LocationMap({ users, onSelect }) {
   useEffect(() => {
     const group = layer.current;
     group.clearLayers();
+    markers.current.clear();
     const bounds = [];
     for (const u of users) {
       if (u.latitude == null) continue;
       const popup =
         `<b>${esc(u.name)}</b><br/>${esc(u.email)}<br/>IP ${esc(u.ip)} — approximate<br/>` +
-        `${esc([u.city, u.state, u.country].filter(Boolean).join(', '))}<br/>Active: ${esc(fmt(u.lastActive))}`;
-      L.circleMarker([u.latitude, u.longitude], { radius: 9, color: IP_COLOR, dashArray: '4 3', fillOpacity: 0.25, weight: 2 })
+        `${esc(u.flag ? `${u.flag} ` : '')}${esc([u.city, u.state, u.country].filter(Boolean).join(', '))}<br/>Active: ${esc(fmt(u.lastActive))}`;
+      const marker = L.circleMarker([u.latitude, u.longitude], { radius: 9, color: IP_COLOR, dashArray: '4 3', fillOpacity: 0.25, weight: 2 })
         .bindPopup(popup).on('click', () => onSelect(u.userId)).addTo(group);
+      markers.current.set(u.userId, marker);
       bounds.push([u.latitude, u.longitude]);
     }
     if (bounds.length && !fitted.current) {
@@ -80,10 +90,20 @@ function LocationMap({ users, onSelect }) {
     }
   }, [users, onSelect]);
 
+  // Fly to and highlight the focused user
+  useEffect(() => {
+    if (!focus?.userId) return;
+    const u = users.find((x) => x.userId === focus.userId);
+    if (!u || u.latitude == null) return;
+    map.current.flyTo([u.latitude, u.longitude], 13, { duration: 0.8 });
+    const marker = markers.current.get(focus.userId);
+    if (marker) setTimeout(() => marker.openPopup(), 300);
+  }, [focus, users]);
+
   return <Box ref={el} sx={{ height: { xs: 320, md: 440 }, borderRadius: 2, overflow: 'hidden', zIndex: 0 }} />;
 }
 
-function DetailsDialog({ userId, onClose }) {
+function DetailsDialog({ userId, onClose, onLocate }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -138,20 +158,44 @@ function DetailsDialog({ userId, onClose }) {
           </>
         )}
       </DialogContent>
-      <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
+      <DialogActions>
+        <Button
+          startIcon={<MyLocationIcon />}
+          disabled={!u || u.latitude == null}
+          onClick={() => { onLocate(u.userId); onClose(); }}
+        >
+          Show on live map
+        </Button>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
     </Dialog>
   );
 }
 
+// Module-level cache: when the admin re-opens this tab, the last data shows instantly
+// while a fresh copy loads in the background. Map data is reused unless it's older than MAP_TTL.
+const cache = { list: null, mapUsers: [], stats: null, mapAt: 0 };
+const MAP_TTL = 60_000;
+
 export default function LocationTracker() {
-  const [stats, setStats] = useState(null);
-  const [mapUsers, setMapUsers] = useState([]);
-  const [list, setList] = useState(null);
+  const [stats, setStats] = useState(cache.stats);
+  const [mapUsers, setMapUsers] = useState(cache.mapUsers);
+  const [list, setList] = useState(cache.list);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [focus, setFocus] = useState(null); // { userId, n } -> map flies to this user
+  const mapRef = useRef(null);
   const [q, setQ] = useState({ search: '', country: '', state: '', city: '', sort: 'latest', page: 0, limit: 10 });
   const [search, setSearch] = useState('');
+
+  // Zoom the live map to a user's current (IP-based) location and scroll it into view
+  const locate = useCallback((userId) => {
+    if (!userId) return;
+    setFocus({ userId, n: Date.now() });
+    mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
 
   // Debounce the search box
   useEffect(() => {
@@ -159,18 +203,25 @@ export default function LocationTracker() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const load = useCallback(async () => {
+  // One request (users) drives the table + stats + filters; the map refreshes at most once a minute.
+  const load = useCallback(async (opts = {}) => {
     setLoading(true);
     try {
       const params = { ...q, page: q.page + 1 };
-      const [s, m, l] = await Promise.all([
-        api.get('/admin/location-tracker/stats'),
-        api.get('/admin/location-tracker/map'),
+      const mapStale = opts.force || Date.now() - cache.mapAt > MAP_TTL;
+      const [l, m] = await Promise.all([
         api.get('/admin/location-tracker/users', { params }),
+        mapStale ? api.get('/admin/location-tracker/map') : Promise.resolve(null),
       ]);
-      setStats(s.data);
-      setMapUsers(m.data.users);
+      cache.list = l.data;
+      cache.stats = l.data.stats;
       setList(l.data);
+      setStats(l.data.stats);
+      if (m) {
+        cache.mapUsers = m.data.users;
+        cache.mapAt = Date.now();
+        setMapUsers(m.data.users);
+      }
       setError('');
     } catch (e) {
       setError(errMsg(e));
@@ -199,9 +250,9 @@ export default function LocationTracker() {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: 'center' }}>
         <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>Location Tracker</Typography>
-        <Button startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={load} disabled={loading}>Refresh</Button>
+        <Button startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => load({ force: true })} disabled={loading}>Refresh</Button>
       </Stack>
-      {error && <Alert severity="error" action={<Button color="inherit" size="small" onClick={load}>Retry</Button>}>{error}</Alert>}
+      {error && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => load({ force: true })}>Retry</Button>}>{error}</Alert>}
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' } }}>
         <Stat label="Tracked users" value={stats?.totalTracked} />
@@ -209,11 +260,11 @@ export default function LocationTracker() {
         <Stat label="Last updated" value={stats && <Typography variant="body2" sx={{ fontWeight: 600, pt: 0.5 }}>{fmt(stats.lastUpdated)}</Typography>} />
       </Box>
 
-      <Card variant="outlined">
+      <Card variant="outlined" ref={mapRef}>
         <CardContent>
-          <LocationMap users={mapUsers} onSelect={setSelected} />
+          <LocationMap users={mapUsers} onSelect={setSelected} focus={focus} />
           <Typography variant="caption" color="text.secondary">
-            IP locations are approximate (city level). Map refreshes every 30 s.
+            IP locations are approximate (city level). Kisi user ko map par dekhne ke liye uski row me 📍 dabao. Map refreshes every 30 s.
           </Typography>
         </CardContent>
       </Card>
@@ -239,7 +290,7 @@ export default function LocationTracker() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    {['User', 'IP', 'Country', 'State / Region', 'City', 'Postal', 'Lat', 'Lng', 'ISP', 'Timezone', 'Last active'].map((h) => (
+                    {['User', 'IP', 'Country', 'State / Region', 'City', 'Postal', 'Lat', 'Lng', 'ISP', 'Timezone', 'Last active', 'Map'].map((h) => (
                       <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -266,6 +317,16 @@ export default function LocationTracker() {
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{u.isp || '—'}</TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{u.timezone || '—'}</TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{fmt(u.lastActive)}</TableCell>
+                      <TableCell>
+                        <Tooltip title={u.latitude == null ? 'No location yet' : 'Show on live map'}>
+                          <span>
+                            <IconButton size="small" color="primary" disabled={u.latitude == null}
+                              onClick={(e) => { e.stopPropagation(); locate(u.userId); }}>
+                              <MyLocationIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -286,7 +347,7 @@ export default function LocationTracker() {
         </CardContent>
       </Card>
 
-      <DetailsDialog userId={selected} onClose={() => setSelected(null)} />
+      <DetailsDialog userId={selected} onClose={() => setSelected(null)} onLocate={locate} />
     </Stack>
   );
 }
