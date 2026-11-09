@@ -113,6 +113,13 @@ const D = {
   'day.noReport': ['No report was generated for this day.', 'इस दिन की रिपोर्ट नहीं बनी।', 'Is din ki report abhi generate nahi hui.'],
   'day.goToday': ['Go to today', 'आज पर जाएँ', 'Go to today'],
   'day.doneToast': ['Great! Task complete ✅', 'शाबाश! काम पूरा ✅', 'Shabash! Task complete ✅'],
+  'day.estPlaceholder': ['Min', 'मिनट', 'Min'],
+  'day.estTitle': ['In how many minutes can you finish it? (optional)', 'कितने मिनट में पूरा करोगे? (ज़रूरी नहीं)', 'Kitne minute me poora karoge? (optional)'],
+  'day.target': ['🎯 {n} min target', '🎯 {n} मिनट टारगेट', '🎯 {n} min target'],
+  'day.left': ['{time} left', '{time} बचा', '{time} bacha'],
+  'day.over': ['+{time} over', '+{time} ज़्यादा', '+{time} over'],
+  'day.timeUp': ['Time up! ⏰', 'समय ख़त्म! ⏰', 'Time up! ⏰'],
+  'day.spent': ['⏱ {time}', '⏱ {time}', '⏱ {time}'],
 
   'rep.report': ['Report', 'रिपोर्ट', 'Report'],
   'rep.final': ['Final (12 AM)', 'फ़ाइनल (12 AM)', 'Final (12 AM)'],

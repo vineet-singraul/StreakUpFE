@@ -58,6 +58,7 @@ export default function DayView() {
   // '/tasks' (no params) is today's data, shared with the dashboard card via the cache
   const { data, error, setData, reload } = useApi('/tasks', param === 'today' ? undefined : { date: param });
   const [title, setTitle] = useState('');
+  const [estimate, setEstimate] = useState(''); // target minutes for a new task
   const [generating, setGenerating] = useState(false);
   const [reasonsOpen, setReasonsOpen] = useState(false);
 
@@ -66,12 +67,24 @@ export default function DayView() {
   const [, tick] = useState(0); // re-render every second while a timer runs
   const activeRef = useRef(null);
   activeRef.current = active;
+  const timeUpNotified = useRef(new Set()); // task ids already warned "time up"
 
   useEffect(() => {
     if (!active) return undefined;
-    const i = setInterval(() => tick((n) => n + 1), 1000);
+    const i = setInterval(() => {
+      tick((n) => n + 1);
+      // One-time "time up" nudge when the countdown hits the target
+      const task = data?.tasks.find((x) => x._id === active.id);
+      if (task?.estimateMinutes) {
+        const elapsed = (task.timeSpent || 0) + Math.floor((Date.now() - active.startedAt) / 1000);
+        if (elapsed >= task.estimateMinutes * 60 && !timeUpNotified.current.has(active.id)) {
+          timeUpNotified.current.add(active.id);
+          toast(t('day.timeUp'), 'info');
+        }
+      }
+    }, 1000);
     return () => clearInterval(i);
-  }, [active]);
+  }, [active, data, toast, t]);
 
   const report = data?.report || null;
   const setReport = (r) => setData((d) => ({ ...d, report: r }));
@@ -87,11 +100,14 @@ export default function DayView() {
     e.preventDefault();
     const clean = title.trim();
     if (!clean) return;
+    const estNum = Number(estimate);
+    const estimateMinutes = Number.isFinite(estNum) && estNum >= 1 ? Math.min(Math.round(estNum), 1440) : undefined;
     const tempId = `tmp-${Date.now()}`;
-    setTasks((ts) => [...ts, { _id: tempId, title: clean, done: false }]);
+    setTasks((ts) => [...ts, { _id: tempId, title: clean, done: false, estimateMinutes }]);
     setTitle('');
+    setEstimate('');
     try {
-      const { data: res } = await api.post('/tasks', { title: clean });
+      const { data: res } = await api.post('/tasks', { title: clean, estimateMinutes });
       setTasks((ts) => ts.map((t) => (t._id === tempId ? { ...res.task, done: t.done } : t)));
     } catch (err) {
       fail(err);
@@ -230,14 +246,24 @@ export default function DayView() {
           />
 
           {data.editable && (
-            <Box component="form" onSubmit={addTask} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+            <Box component="form" onSubmit={addTask} sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
               <TextField
-                fullWidth
                 size="small"
                 placeholder={t('day.placeholder')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
+                sx={{ flex: '1 1 160px' }}
+              />
+              <TextField
+                size="small"
+                type="number"
+                placeholder={t('day.estPlaceholder')}
+                title={t('day.estTitle')}
+                value={estimate}
+                onChange={(e) => setEstimate(e.target.value)}
+                inputProps={{ min: 1, max: 1440, 'aria-label': t('day.estTitle') }}
+                sx={{ width: 96 }}
               />
               <Button type="submit" variant="contained" startIcon={<AddIcon />} sx={{ flexShrink: 0 }}>
                 {t('day.add')}
@@ -251,74 +277,96 @@ export default function DayView() {
             </Typography>
           ) : (
             <List disablePadding>
-              {data.tasks.map((t) => (
-                <ListItem
-                  key={t._id}
-                  disableGutters
-                  divider
-                  secondaryAction={
-                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                      {/* Focus timer: only on today's not-yet-done tasks */}
-                      {data.editable && !t.done && !String(t._id).startsWith('tmp-') && (
-                        <>
-                          {(liveTime(t) > 0 || active?.id === t._id) && (
-                            <Chip
-                              size="small"
-                              label={fmtTime(liveTime(t))}
-                              color={active?.id === t._id ? 'primary' : 'default'}
-                              variant={active?.id === t._id ? 'filled' : 'outlined'}
-                              sx={{ fontVariantNumeric: 'tabular-nums', minWidth: 56 }}
-                            />
-                          )}
+              {data.tasks.map((task) => {
+                const running = active?.id === task._id;
+                const elapsed = liveTime(task);
+                const isTmp = String(task._id).startsWith('tmp-');
+                const canTime = data.editable && !task.done && !isTmp;
+                // Countdown toward the user's target, or a plain stopwatch when no target was set
+                let timeChip = null;
+                if (canTime && (elapsed > 0 || running)) {
+                  if (task.estimateMinutes) {
+                    const remaining = task.estimateMinutes * 60 - elapsed;
+                    const over = remaining < 0;
+                    timeChip = (
+                      <Chip
+                        size="small"
+                        color={over ? 'error' : running ? 'primary' : 'default'}
+                        variant={running ? 'filled' : 'outlined'}
+                        label={over ? t('day.over', { time: fmtTime(-remaining) }) : t('day.left', { time: fmtTime(remaining) })}
+                        sx={{ fontVariantNumeric: 'tabular-nums' }}
+                      />
+                    );
+                  } else {
+                    timeChip = (
+                      <Chip
+                        size="small"
+                        color={running ? 'primary' : 'default'}
+                        variant={running ? 'filled' : 'outlined'}
+                        label={fmtTime(elapsed)}
+                        sx={{ fontVariantNumeric: 'tabular-nums', minWidth: 56 }}
+                      />
+                    );
+                  }
+                }
+                return (
+                  <ListItem
+                    key={task._id}
+                    disableGutters
+                    divider
+                    secondaryAction={
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                        {timeChip}
+                        {canTime && (
                           <IconButton
                             edge="end"
-                            color={active?.id === t._id ? 'primary' : 'default'}
-                            onClick={() => (active?.id === t._id ? stopTimer() : startTimer(t))}
-                            aria-label={active?.id === t._id ? 'Pause timer' : 'Start timer'}
+                            color={running ? 'primary' : 'default'}
+                            onClick={() => (running ? stopTimer() : startTimer(task))}
+                            aria-label={running ? 'Pause timer' : 'Start timer'}
                           >
-                            {active?.id === t._id ? <PauseIcon /> : <PlayArrowIcon />}
+                            {running ? <PauseIcon /> : <PlayArrowIcon />}
                           </IconButton>
-                        </>
+                        )}
+                        {(!data.editable || task.done) && task.timeSpent > 0 && (
+                          <Chip size="small" variant="outlined" label={t('day.spent', { time: fmtTime(task.timeSpent) })} sx={{ fontVariantNumeric: 'tabular-nums' }} />
+                        )}
+                        {data.editable && (
+                          <IconButton edge="end" onClick={() => remove(task)} disabled={isTmp}>
+                            <DeleteOutlineIcon />
+                          </IconButton>
+                        )}
+                      </Stack>
+                    }
+                  >
+                    <ListItemIcon sx={{ minWidth: 42 }}>
+                      {/* a past day's unticked task is marked missed */}
+                      {!data.editable && !task.done ? (
+                        <CloseIcon color="error" sx={{ ml: 0.5 }} />
+                      ) : (
+                        <Checkbox
+                          edge="start"
+                          checked={task.done}
+                          disabled={!data.editable || isTmp}
+                          onChange={() => toggle(task)}
+                          color="success"
+                        />
                       )}
-                      {/* Done or past task: show logged time if any */}
-                      {(!data.editable || t.done) && t.timeSpent > 0 && (
-                        <Chip size="small" variant="outlined" label={fmtTime(t.timeSpent)} sx={{ fontVariantNumeric: 'tabular-nums' }} />
-                      )}
-                      {data.editable && (
-                        <IconButton edge="end" onClick={() => remove(t)} disabled={String(t._id).startsWith('tmp-')}>
-                          <DeleteOutlineIcon />
-                        </IconButton>
-                      )}
-                    </Stack>
-                  }
-                >
-                  <ListItemIcon sx={{ minWidth: 42 }}>
-                    {/* a past day's unticked task is marked missed */}
-                    {!data.editable && !t.done ? (
-                      <CloseIcon color="error" sx={{ ml: 0.5 }} />
-                    ) : (
-                      <Checkbox
-                        edge="start"
-                        checked={t.done}
-                        disabled={!data.editable || String(t._id).startsWith('tmp-')}
-                        onChange={() => toggle(t)}
-                        color="success"
-                      />
-                    )}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={t.title}
-                    sx={{
-                      pr: 13,
-                      '& .MuiListItemText-primary': {
-                        textDecoration: t.done ? 'line-through' : 'none',
-                        color: t.done ? 'text.secondary' : 'text.primary',
-                        wordBreak: 'break-word',
-                      },
-                    }}
-                  />
-                </ListItem>
-              ))}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={task.title}
+                      secondary={task.estimateMinutes ? t('day.target', { n: task.estimateMinutes }) : null}
+                      sx={{
+                        pr: 12,
+                        '& .MuiListItemText-primary': {
+                          textDecoration: task.done ? 'line-through' : 'none',
+                          color: task.done ? 'text.secondary' : 'text.primary',
+                          wordBreak: 'break-word',
+                        },
+                      }}
+                    />
+                  </ListItem>
+                );
+              })}
             </List>
           )}
         </CardContent>
