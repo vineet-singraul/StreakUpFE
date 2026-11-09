@@ -19,6 +19,7 @@ import TodayIcon from '@mui/icons-material/Today';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SettingsIcon from '@mui/icons-material/Settings';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import LogoutIcon from '@mui/icons-material/Logout';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { useAuth } from '../AuthContext';
@@ -41,6 +42,7 @@ const NAV = [
   { label: 'nav.today', path: '/day/today', icon: <TodayIcon /> },
   { label: 'nav.reports', path: '/reports', icon: <InsightsIcon /> },
   { label: 'nav.challenge', path: '/challenge', icon: <EmojiEventsIcon /> },
+  { label: 'nav.rewards', path: '/rewards', icon: <WorkspacePremiumIcon /> },
   { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 

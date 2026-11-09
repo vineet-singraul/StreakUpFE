@@ -13,6 +13,7 @@ const DayView = lazy(() => import('./pages/DayView'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
+const Rewards = lazy(() => import('./pages/Rewards'));
 const Admin = lazy(() => import('./pages/Admin'));
 
 const FullScreenLoader = () => (
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/day/:date" element={page(<DayView />)} />
         <Route path="/reports" element={page(<Reports />)} />
         <Route path="/challenge" element={page(<Challenge />)} />
+        <Route path="/rewards" element={page(<Rewards />)} />
         <Route path="/settings" element={page(<Settings />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
