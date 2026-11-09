@@ -46,12 +46,12 @@ const NAV = [
   { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
+// Derive the active tab from the URL by matching NAV paths, so adding/reordering
+// tabs can't desync the highlight or the bottom-nav navigation again.
 function activeIndex(pathname) {
-  if (pathname.startsWith('/day/')) return 1;
-  if (pathname.startsWith('/reports')) return 2;
-  if (pathname.startsWith('/challenge')) return 3;
-  if (pathname.startsWith('/settings')) return 4;
-  return 0;
+  if (pathname.startsWith('/day/')) return NAV.findIndex((n) => n.path.startsWith('/day/'));
+  const i = NAV.findIndex((n) => n.path !== '/' && pathname.startsWith(n.path));
+  return i === -1 ? 0 : i;
 }
 
 export default function Layout() {

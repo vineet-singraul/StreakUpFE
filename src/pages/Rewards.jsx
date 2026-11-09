@@ -8,12 +8,47 @@ import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Skeleton from '@mui/material/Skeleton';
 import Button from '@mui/material/Button';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import MilitaryTechIcon from '@mui/icons-material/MilitaryTech';
 import BoltIcon from '@mui/icons-material/Bolt';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../cache';
 import { errMsg } from '../api';
 import { useT } from '../i18n';
+
+const HOW_IT_WORKS = [
+  ['⚡', 'XP kamao', 'Har habit complete (tick) karne par 10 XP milta hai. Jis din aap koi bhi habit karo, us din ka 5 XP bonus extra.'],
+  ['🆙', 'Level badhao', 'Jitna zyada XP, utna upar Level. Har level ke liye thoda zyada XP chahiye hota hai — progress bar dikhata hai next level kitna door hai.'],
+  ['🔥', 'Streak banao', 'Lagaatar din habit complete karoge to streak banta hai. Ek bhi pura din miss kiya to streak 0 ho jaata hai. Aaj ka abhi nahi kiya? Koi baat nahi — streak kal tak safe rehta hai.'],
+  ['🏅', 'Badges unlock karo', 'Milestones par badges milte hain — jaise 7-din streak, 100 completions, Level 10. Locked badge grey dikhta hai; complete karte hi colour me aa jaata hai.'],
+];
+
+function HowItWorks({ defaultOpen }) {
+  return (
+    <Accordion defaultExpanded={defaultOpen} variant="outlined" disableGutters>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography sx={{ fontWeight: 700 }}>❓ Rewards kaise kaam karta hai?</Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Stack spacing={1.5}>
+          {HOW_IT_WORKS.map(([icon, title, desc]) => (
+            <Stack key={title} direction="row" spacing={1.5} sx={{ alignItems: 'flex-start' }}>
+              <Typography sx={{ fontSize: 24, lineHeight: 1.2 }}>{icon}</Typography>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{title}</Typography>
+                <Typography variant="body2" color="text.secondary">{desc}</Typography>
+              </Box>
+            </Stack>
+          ))}
+        </Stack>
+      </AccordionDetails>
+    </Accordion>
+  );
+}
 
 function StatTile({ icon, value, label, color }) {
   return (
@@ -29,6 +64,7 @@ function StatTile({ icon, value, label, color }) {
 
 export default function Rewards() {
   const t = useT();
+  const navigate = useNavigate();
   const { data, error, reload } = useApi('/gamification/me');
 
   if (error) {
@@ -45,10 +81,36 @@ export default function Rewards() {
   }
 
   const pct = data.xpForNext ? Math.min(100, Math.round((data.xpInLevel / data.xpForNext) * 100)) : 0;
+  const fresh = data.totals.completions === 0;
+
+  // New user, zero activity: explain the whole thing clearly before showing empty numbers
+  if (fresh) {
+    return (
+      <Stack spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 820 }}>
+        <Typography variant="h5">{t('nav.rewards')}</Typography>
+        <Card sx={{ background: 'linear-gradient(135deg, #7c4dff 0%, #448aff 100%)', color: '#fff' }}>
+          <CardContent sx={{ textAlign: 'center', py: 4 }}>
+            <Typography sx={{ fontSize: 48 }}>🎯</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>Apna reward journey shuru karo!</Typography>
+            <Typography variant="body2" sx={{ opacity: 0.9, mt: 1, maxWidth: 440, mx: 'auto' }}>
+              Habits complete karte jao aur XP, levels, streaks 🔥 aur badges 🏅 kamao. Abhi aapke paas koi
+              completion nahi hai — pehli habit tick karte hi yahan progress dikhne lagega.
+            </Typography>
+            <Button variant="contained" color="inherit" sx={{ mt: 2, color: 'primary.main', fontWeight: 700 }} onClick={() => navigate('/day/today')}>
+              Aaj ki habits karो
+            </Button>
+          </CardContent>
+        </Card>
+        <HowItWorks defaultOpen />
+      </Stack>
+    );
+  }
 
   return (
     <Stack spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 820 }}>
       <Typography variant="h5">{t('nav.rewards')}</Typography>
+
+      <HowItWorks defaultOpen={false} />
 
       {/* Level + XP progress */}
       <Card sx={{ background: 'linear-gradient(135deg, #7c4dff 0%, #448aff 100%)', color: '#fff' }}>
@@ -106,9 +168,6 @@ export default function Rewards() {
         </CardContent>
       </Card>
 
-      <Typography variant="caption" color="text.secondary">
-        Har habit complete karne par 10 XP, aur streak wale din ka bonus milta hai. Streak tabhi tootega jab aap poora din koi habit complete na karo.
-      </Typography>
     </Stack>
   );
 }

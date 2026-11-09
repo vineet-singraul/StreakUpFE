@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -24,6 +24,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LockClockIcon from '@mui/icons-material/LockClock';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
 import api, { errMsg } from '../api';
 import { useApi } from '../cache';
 import { useToast } from '../Toast';
@@ -38,6 +40,15 @@ function shiftDate(date, days) {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 }
 
+// seconds -> "m:ss" or "h:mm:ss"
+function fmtTime(s) {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
 export default function DayView() {
   const { date: param } = useParams();
   const navigate = useNavigate();
@@ -49,6 +60,18 @@ export default function DayView() {
   const [title, setTitle] = useState('');
   const [generating, setGenerating] = useState(false);
   const [reasonsOpen, setReasonsOpen] = useState(false);
+
+  // Focus timer: at most one task runs at a time. `active` = { id, startedAt }
+  const [active, setActive] = useState(null);
+  const [, tick] = useState(0); // re-render every second while a timer runs
+  const activeRef = useRef(null);
+  activeRef.current = active;
+
+  useEffect(() => {
+    if (!active) return undefined;
+    const i = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(i);
+  }, [active]);
 
   const report = data?.report || null;
   const setReport = (r) => setData((d) => ({ ...d, report: r }));
@@ -75,7 +98,43 @@ export default function DayView() {
     }
   };
 
+  // Save the running timer's elapsed seconds to the task, then clear it
+  const stopTimer = async () => {
+    const cur = activeRef.current;
+    if (!cur) return;
+    setActive(null);
+    const secs = Math.floor((Date.now() - cur.startedAt) / 1000);
+    if (secs < 1) return;
+    setTasks((ts) => ts.map((t) => (t._id === cur.id ? { ...t, timeSpent: (t.timeSpent || 0) + secs } : t)));
+    try {
+      await api.patch(`/tasks/${cur.id}`, { addSeconds: secs });
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  const startTimer = async (task) => {
+    await stopTimer(); // only one timer at a time
+    setActive({ id: task._id, startedAt: Date.now() });
+  };
+
+  // Flush an unsaved running timer when leaving the page
+  useEffect(
+    () => () => {
+      const cur = activeRef.current;
+      if (!cur) return;
+      const secs = Math.floor((Date.now() - cur.startedAt) / 1000);
+      if (secs >= 1) api.patch(`/tasks/${cur.id}`, { addSeconds: secs }).catch(() => {});
+    },
+    [],
+  );
+
+  // Live total shown for a task (saved seconds + the currently running stretch)
+  const liveTime = (task) =>
+    (task.timeSpent || 0) + (active?.id === task._id ? Math.floor((Date.now() - active.startedAt) / 1000) : 0);
+
   const toggle = async (task) => {
+    if (active?.id === task._id) await stopTimer();
     setTasks((ts) => ts.map((t) => (t._id === task._id ? { ...t, done: !t.done } : t)));
     if (!task.done) toast(t('day.doneToast'));
     try {
@@ -86,6 +145,7 @@ export default function DayView() {
   };
 
   const remove = async (task) => {
+    if (active?.id === task._id) setActive(null);
     setTasks((ts) => ts.filter((t) => t._id !== task._id));
     try {
       await api.delete(`/tasks/${task._id}`);
@@ -197,11 +257,39 @@ export default function DayView() {
                   disableGutters
                   divider
                   secondaryAction={
-                    data.editable && (
-                      <IconButton edge="end" onClick={() => remove(t)} disabled={String(t._id).startsWith('tmp-')}>
-                        <DeleteOutlineIcon />
-                      </IconButton>
-                    )
+                    <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                      {/* Focus timer: only on today's not-yet-done tasks */}
+                      {data.editable && !t.done && !String(t._id).startsWith('tmp-') && (
+                        <>
+                          {(liveTime(t) > 0 || active?.id === t._id) && (
+                            <Chip
+                              size="small"
+                              label={fmtTime(liveTime(t))}
+                              color={active?.id === t._id ? 'primary' : 'default'}
+                              variant={active?.id === t._id ? 'filled' : 'outlined'}
+                              sx={{ fontVariantNumeric: 'tabular-nums', minWidth: 56 }}
+                            />
+                          )}
+                          <IconButton
+                            edge="end"
+                            color={active?.id === t._id ? 'primary' : 'default'}
+                            onClick={() => (active?.id === t._id ? stopTimer() : startTimer(t))}
+                            aria-label={active?.id === t._id ? 'Pause timer' : 'Start timer'}
+                          >
+                            {active?.id === t._id ? <PauseIcon /> : <PlayArrowIcon />}
+                          </IconButton>
+                        </>
+                      )}
+                      {/* Done or past task: show logged time if any */}
+                      {(!data.editable || t.done) && t.timeSpent > 0 && (
+                        <Chip size="small" variant="outlined" label={fmtTime(t.timeSpent)} sx={{ fontVariantNumeric: 'tabular-nums' }} />
+                      )}
+                      {data.editable && (
+                        <IconButton edge="end" onClick={() => remove(t)} disabled={String(t._id).startsWith('tmp-')}>
+                          <DeleteOutlineIcon />
+                        </IconButton>
+                      )}
+                    </Stack>
                   }
                 >
                   <ListItemIcon sx={{ minWidth: 42 }}>
@@ -221,7 +309,7 @@ export default function DayView() {
                   <ListItemText
                     primary={t.title}
                     sx={{
-                      pr: 4,
+                      pr: 13,
                       '& .MuiListItemText-primary': {
                         textDecoration: t.done ? 'line-through' : 'none',
                         color: t.done ? 'text.secondary' : 'text.primary',
