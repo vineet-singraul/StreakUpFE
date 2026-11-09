@@ -23,12 +23,20 @@ const theme = createTheme({
   shape: { borderRadius: 12 },
   typography: {
     fontFamily: 'Inter, "Segoe UI", Roboto, Arial, sans-serif',
-    h4: { fontWeight: 700 },
-    h5: { fontWeight: 700 },
-    h6: { fontWeight: 600 },
+    // Headings shrink on phones so they never feel oversized or cause overflow
+    h4: { fontWeight: 700, fontSize: '1.6rem', '@media (min-width:600px)': { fontSize: '2.125rem' } },
+    h5: { fontWeight: 700, fontSize: '1.3rem', '@media (min-width:600px)': { fontSize: '1.5rem' } },
+    h6: { fontWeight: 600, fontSize: '1.1rem', '@media (min-width:600px)': { fontSize: '1.25rem' } },
     button: { textTransform: 'none', fontWeight: 600 },
   },
   components: {
+    // Safety net: nothing causes a horizontal scrollbar on mobile
+    MuiCssBaseline: {
+      styleOverrides: {
+        'html, body, #root': { maxWidth: '100%' },
+        body: { overflowX: 'hidden' },
+      },
+    },
     MuiCard: {
       defaultProps: { variant: 'outlined' },
     },

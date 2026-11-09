@@ -9,10 +9,6 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Checkbox from '@mui/material/Checkbox';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
 import LinearProgress from '@mui/material/LinearProgress';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
@@ -253,7 +249,7 @@ export default function DayView() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
-                sx={{ flex: '1 1 160px' }}
+                sx={{ flex: { xs: '1 1 100%', sm: '1 1 160px' } }}
               />
               <TextField
                 size="small"
@@ -276,7 +272,7 @@ export default function DayView() {
               {data.editable ? t('day.emptyEdit') : t('day.emptyPast')}
             </Typography>
           ) : (
-            <List disablePadding>
+            <Box>
               {data.tasks.map((task) => {
                 const running = active?.id === task._id;
                 const elapsed = liveTime(task);
@@ -309,65 +305,73 @@ export default function DayView() {
                     );
                   }
                 }
+                const spentChip = (!data.editable || task.done) && task.timeSpent > 0 && (
+                  <Chip size="small" variant="outlined" label={t('day.spent', { time: fmtTime(task.timeSpent) })} sx={{ fontVariantNumeric: 'tabular-nums', height: 22 }} />
+                );
                 return (
-                  <ListItem
+                  <Box
                     key={task._id}
-                    disableGutters
-                    divider
-                    secondaryAction={
-                      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                        {timeChip}
-                        {canTime && (
-                          <IconButton
-                            edge="end"
-                            color={running ? 'primary' : 'default'}
-                            onClick={() => (running ? stopTimer() : startTimer(task))}
-                            aria-label={running ? 'Pause timer' : 'Start timer'}
-                          >
-                            {running ? <PauseIcon /> : <PlayArrowIcon />}
-                          </IconButton>
-                        )}
-                        {(!data.editable || task.done) && task.timeSpent > 0 && (
-                          <Chip size="small" variant="outlined" label={t('day.spent', { time: fmtTime(task.timeSpent) })} sx={{ fontVariantNumeric: 'tabular-nums' }} />
-                        )}
-                        {data.editable && (
-                          <IconButton edge="end" onClick={() => remove(task)} disabled={isTmp}>
-                            <DeleteOutlineIcon />
-                          </IconButton>
-                        )}
-                      </Stack>
-                    }
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5, py: 1, borderBottom: 1, borderColor: 'divider' }}
                   >
-                    <ListItemIcon sx={{ minWidth: 42 }}>
-                      {/* a past day's unticked task is marked missed */}
+                    {/* Status: checkbox, or a cross for a missed past task */}
+                    <Box sx={{ flexShrink: 0, width: 40, display: 'grid', placeItems: 'center' }}>
                       {!data.editable && !task.done ? (
-                        <CloseIcon color="error" sx={{ ml: 0.5 }} />
+                        <CloseIcon color="error" />
                       ) : (
                         <Checkbox
-                          edge="start"
+                          sx={{ p: 0.5 }}
                           checked={task.done}
                           disabled={!data.editable || isTmp}
                           onChange={() => toggle(task)}
                           color="success"
                         />
                       )}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={task.title}
-                      secondary={task.estimateMinutes ? t('day.target', { n: task.estimateMinutes }) : null}
-                      sx={{
-                        pr: 12,
-                        '& .MuiListItemText-primary': {
+                    </Box>
+
+                    {/* Title + target/time meta (this column shrinks, never the controls) */}
+                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                      <Typography
+                        sx={{
+                          wordBreak: 'break-word',
                           textDecoration: task.done ? 'line-through' : 'none',
                           color: task.done ? 'text.secondary' : 'text.primary',
-                          wordBreak: 'break-word',
-                        },
-                      }}
-                    />
-                  </ListItem>
+                        }}
+                      >
+                        {task.title}
+                      </Typography>
+                      {(task.estimateMinutes || timeChip || spentChip) && (
+                        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}>
+                          {task.estimateMinutes && (
+                            <Typography variant="caption" color="text.secondary">{t('day.target', { n: task.estimateMinutes })}</Typography>
+                          )}
+                          {timeChip}
+                          {spentChip}
+                        </Stack>
+                      )}
+                    </Box>
+
+                    {/* Controls: fixed, never overflow */}
+                    <Box sx={{ flexShrink: 0, display: 'flex' }}>
+                      {canTime && (
+                        <IconButton
+                          size="small"
+                          color={running ? 'primary' : 'default'}
+                          onClick={() => (running ? stopTimer() : startTimer(task))}
+                          aria-label={running ? 'Pause timer' : 'Start timer'}
+                        >
+                          {running ? <PauseIcon /> : <PlayArrowIcon />}
+                        </IconButton>
+                      )}
+                      {data.editable && (
+                        <IconButton size="small" onClick={() => remove(task)} disabled={isTmp}>
+                          <DeleteOutlineIcon />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </Box>
                 );
               })}
-            </List>
+            </Box>
           )}
         </CardContent>
       </Card>
