@@ -104,9 +104,11 @@ function DetailsDialog({ userId, onClose }) {
           <>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 2 }}>
               {[
-                ['IP', u.ip], ['ISP', u.isp], ['Timezone', u.timezone],
-                ['Location', [u.city, u.state, u.country].filter(Boolean).join(', ')],
-                ['Latitude', num(u.latitude)], ['Longitude', num(u.longitude)], ['Last active', fmt(u.lastActive)],
+                ['IP', u.ip], ['Country', [u.flag, u.country, u.countryCode && `(${u.countryCode})`].filter(Boolean).join(' ')],
+                ['State / Region', u.state], ['City', u.city], ['Postal / ZIP', u.postal], ['Continent', u.continent],
+                ['Latitude', num(u.latitude)], ['Longitude', num(u.longitude)],
+                ['ISP', u.isp], ['Organisation', u.org], ['ASN', u.asn],
+                ['Timezone', u.timezone], ['UTC offset', u.utcOffset], ['Last active', fmt(u.lastActive)],
               ].map(([k, v]) => (
                 <Box key={k}><Typography variant="caption" color="text.secondary">{k}</Typography><Typography variant="body2">{v || '—'}</Typography></Box>
               ))}
@@ -237,7 +239,7 @@ export default function LocationTracker() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    {['User', 'IP', 'Country', 'State', 'City', 'Lat', 'Lng', 'ISP', 'Last active'].map((h) => (
+                    {['User', 'IP', 'Country', 'State / Region', 'City', 'Postal', 'Lat', 'Lng', 'ISP', 'Timezone', 'Last active'].map((h) => (
                       <TableCell key={h} sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -255,12 +257,14 @@ export default function LocationTracker() {
                         </Stack>
                       </TableCell>
                       <TableCell>{u.ip || '—'}</TableCell>
-                      <TableCell>{u.country || '—'}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{[u.flag, u.country].filter(Boolean).join(' ') || '—'}</TableCell>
                       <TableCell>{u.state || '—'}</TableCell>
                       <TableCell>{u.city || '—'}</TableCell>
+                      <TableCell>{u.postal || '—'}</TableCell>
                       <TableCell>{num(u.latitude)}</TableCell>
                       <TableCell>{num(u.longitude)}</TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{u.isp || '—'}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{u.timezone || '—'}</TableCell>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{fmt(u.lastActive)}</TableCell>
                     </TableRow>
                   ))}
