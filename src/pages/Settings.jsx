@@ -84,7 +84,6 @@ export default function Settings() {
   return (
     <Stack spacing={{ xs: 2, md: 3 }} sx={{ maxWidth: 720 }}>
       <Typography variant="h5">{t('nav.settings')}</Typography>
-
       <Card>
         <CardContent>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>

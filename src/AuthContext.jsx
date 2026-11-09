@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import api, { TOKEN_KEY } from './api';
 import { clearCache } from './cache';
+import { reportIp, resetTracking } from './locationTracker';
 
 const USER_KEY = 'ht_user';
 const AuthContext = createContext(null);
@@ -22,6 +23,12 @@ function saveLocation(onSaved) {
     () => {}, // permission denied / unavailable: ignore
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 5 * 60 * 1000 },
   );
+}
+
+// IP-based approximate location for every signed-in (non-admin) user
+function startLocationTracking(user) {
+  if (!user || user.isAdmin) return;
+  reportIp();
 }
 
 function readCachedUser() {
@@ -57,6 +64,7 @@ export function AuthProvider({ children }) {
         setUser(res.data.user);
         // Already logged-in users (saved token) don't go through login again, so capture here too
         saveLocation(setUser);
+        startLocationTracking(res.data.user);
       })
       .catch((err) => {
         if (err.response?.status === 401) {
@@ -73,10 +81,12 @@ export function AuthProvider({ children }) {
     clearCache();
     setUser(data.user);
     saveLocation(setUser);
+    startLocationTracking(data.user);
     return data;
   }, [setUser]);
 
   const logout = useCallback(() => {
+    resetTracking();
     localStorage.removeItem(TOKEN_KEY);
     clearCache();
     setUser(null);

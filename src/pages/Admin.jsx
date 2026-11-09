@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
@@ -475,7 +475,11 @@ const SECTIONS = [
   { label: 'Overview', icon: <DashboardIcon /> },
   { label: 'Users', icon: <PeopleIcon /> },
   { label: 'Locations', icon: <PlaceIcon /> },
+  { label: 'Location Tracker', icon: <MyLocationIcon /> },
 ];
+
+// Leaflet is only downloaded when the admin opens this tab
+const LocationTracker = lazy(() => import('../components/LocationTracker'));
 
 export default function Admin() {
   const { user, logout } = useAuth();
@@ -546,7 +550,7 @@ export default function Admin() {
             <IconButton onClick={() => { logout(); navigate('/login'); }}><LogoutIcon /></IconButton>
           </Tooltip>
         </Toolbar>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={{ maxWidth: 600, mx: 'auto', width: '100%' }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ maxWidth: 820, mx: 'auto', width: '100%' }}>
           {SECTIONS.map((s) => <Tab key={s.label} icon={s.icon} iconPosition="start" label={s.label} sx={{ minHeight: 52 }} />)}
         </Tabs>
       </AppBar>
@@ -564,6 +568,11 @@ export default function Admin() {
             {tab === 0 && <Overview users={users} onOpenUser={(u) => (u.lastLocation ? openLocation(u) : setTab(1))} />}
             {tab === 1 && <Users users={users} onOpenUser={openLocation} onTasks={setTasksUser} onToggleBlock={toggleBlock} />}
             {tab === 2 && <Locations users={users} selectedId={selectedId} onSelect={setSelectedId} />}
+            {tab === 3 && (
+              <Suspense fallback={<Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress /></Box>}>
+                <LocationTracker />
+              </Suspense>
+            )}
           </>
         )}
       </Container>
