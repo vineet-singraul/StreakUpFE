@@ -187,23 +187,34 @@ export function buildProfile(templates) {
   return { baseline, impostor, quality: impostor / Math.max(baseline, 1e-6) };
 }
 
+/**
+ * ONE recording -> 3 templates: the original plus a slower and a faster copy (as if the user said it
+ * calmly or in a hurry). Lets the user record just once and still match natural variation.
+ */
+export function augment(frames) {
+  // Stretch in time only (MFCC frames), so the voice's pitch/tone stays the same
+  const stretch = (factor) =>
+    Array.from({ length: Math.max(1, Math.round(frames.length / factor)) }, (_, i) => frames[Math.min(frames.length - 1, Math.round(i * factor))]);
+  return [frames, stretch(0.85), stretch(1.15)];
+}
+
+export const DEFAULT_SENSITIVITY = 8;
+
 /** Sensitivity 1 (strict) .. 10 (easy) -> how far from "own voice" towards "something else" we accept */
-export function thresholdFor(profile, sensitivity = profile.sensitivity ?? 5) {
-  const k = 0.08 + (Math.min(10, Math.max(1, sensitivity)) - 1) * 0.035; // 0.08 .. 0.395
+export function thresholdFor(profile, sensitivity = profile.sensitivity ?? DEFAULT_SENSITIVITY) {
+  const k = 0.2 + (Math.min(10, Math.max(1, sensitivity)) - 1) * 0.07; // 0.2 .. 0.83
   const gap = Math.max(0, profile.impostor - profile.baseline);
   return profile.baseline * 1.1 + gap * k;
 }
 
-/** Does this MFCC segment match the profile? */
+/** Does this MFCC segment match the profile? Lenient: the closest template decides. */
 export function matchSegment(profile, seg) {
   const lens = profile.templates.map((t) => t.length);
   const avgLen = lens.reduce((s, x) => s + x, 0) / lens.length;
-  // A totally different length can't be the same phrase
-  if (seg.length < avgLen * 0.55 || seg.length > avgLen * 1.8) return { match: false, score: Infinity, reason: 'length' };
-  const scores = profile.templates.map((t) => dtw(t, seg)).sort((x, y) => x - y);
+  // Only a wildly different length is rejected outright
+  if (seg.length < avgLen * 0.4 || seg.length > avgLen * 2.5) return { match: false, score: Infinity, reason: 'length' };
+  const score = Math.min(...profile.templates.map((t) => dtw(t, seg)));
   const threshold = thresholdFor(profile);
-  // Best AND second-best must be close: one lucky template alone doesn't count
-  const score = (scores[0] + (scores[1] ?? scores[0])) / 2;
   return { match: score <= threshold, score, threshold };
 }
 

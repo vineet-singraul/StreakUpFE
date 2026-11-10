@@ -25,7 +25,7 @@ import api, { errMsg } from '../api';
 import { useAuth } from '../AuthContext';
 import { useToast } from '../Toast';
 import { pushSupported } from '../push';
-import { buildProfile, mfcc, packTemplates, thresholdFor, unpackTemplates } from '../voice/matcher';
+import { DEFAULT_SENSITIVITY, augment, buildProfile, mfcc, packTemplates, thresholdFor, unpackTemplates } from '../voice/matcher';
 import {
   cancelRecording,
   deleteProfile,
@@ -41,7 +41,7 @@ import {
   updateSensitivity,
 } from '../voice/guard';
 
-const SAMPLES = 3;
+const SAMPLES = 1; // one recording; matcher.augment() makes slower/faster copies
 const pulse = keyframes`0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 18px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}`;
 
 function useGuard() {
@@ -88,15 +88,16 @@ function VoiceSetup({ userId, profile, onSaved }) {
       await ensureAudio();
       const seg = await recordSample();
       const next = [...samples, mfcc(seg)];
+      const templates = SAMPLES === 1 ? augment(next[0]) : next;
       setSamples(next);
       if (next.length === SAMPLES) {
-        const stats = buildProfile(next);
-        if (stats.quality < 3) {
+        const stats = buildProfile(templates);
+        if (stats.quality < 2) {
           setSamples([]);
-          setError('Teeno recordings ek jaisi nahi lagin. Shaant jagah pe, same phrase same tarah 3 baar bolo.');
+          setError('Recording saaf nahi aayi. Shaant jagah pe thoda zor se dobara bolo.');
           return;
         }
-        const p = { phrase: phrase.trim(), templates: packTemplates(next), ...stats, sensitivity: profile?.sensitivity ?? 5, createdAt: new Date().toISOString() };
+        const p = { phrase: phrase.trim(), templates: packTemplates(templates), ...stats, sensitivity: profile?.sensitivity ?? DEFAULT_SENSITIVITY, createdAt: new Date().toISOString() };
         if (!saveProfile(userId, p)) throw new Error('Is browser me save nahi ho paya (storage band hai?)');
         setEditing(false);
         setSamples([]);
@@ -139,7 +140,7 @@ function VoiceSetup({ userId, profile, onSaved }) {
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
-        Ek unique phrase chuno jo aap phone ko dhundte waqt zor se bologe, jaise <b>"Oye Chhotu kahan hai"</b> ya{' '}
+        Ek phrase chuno aur sirf <b>1 baar</b> bolo, jaise <b>"Open Alexa"</b>, <b>"Oye Chhotu kahan hai"</b> ya{' '}
         <b>"Mera phone bolo"</b>. 3–5 shabd best hain. Roz-marra ki baat wale shabd (jaise "hello") mat rakho.
       </Typography>
       <TextField
@@ -152,7 +153,7 @@ function VoiceSetup({ userId, profile, onSaved }) {
       />
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
         {Array.from({ length: SAMPLES }, (_, i) => (
-          <Chip key={i} label={`Sample ${i + 1}`} color={i < samples.length ? 'success' : 'default'} icon={i < samples.length ? <CheckCircleIcon /> : undefined} />
+          <Chip key={i} label={SAMPLES === 1 ? 'Recording' : `Sample ${i + 1}`} color={i < samples.length ? 'success' : 'default'} icon={i < samples.length ? <CheckCircleIcon /> : undefined} />
         ))}
       </Stack>
       {recording && (
@@ -164,7 +165,7 @@ function VoiceSetup({ userId, profile, onSaved }) {
       {error && <Alert severity="warning">{error}</Alert>}
       <Stack direction="row" spacing={1}>
         <Button variant="contained" startIcon={<MicIcon />} onClick={record} disabled={!ready || recording}>
-          {recording ? 'Sun raha hoon…' : `Sample ${samples.length + 1} record karo`}
+          {recording ? 'Sun raha hoon…' : SAMPLES === 1 ? 'Awaaz record karo (1 baar)' : `Sample ${samples.length + 1} record karo`}
         </Button>
         {samples.length > 0 && !recording && (
           <Button onClick={() => setSamples([])}>Reset</Button>
@@ -183,7 +184,7 @@ function VoiceSetup({ userId, profile, onSaved }) {
 // ---------------- Step 2: guard mode ----------------
 function GuardMode({ userId, profile, onChange }) {
   const guard = useGuard();
-  const [sens, setSens] = useState(profile?.sensitivity ?? 5);
+  const [sens, setSens] = useState(profile?.sensitivity ?? DEFAULT_SENSITIVITY);
   const on = guard.status !== 'off';
   const p = profile && { ...profile, templates: null, sensitivity: sens };
 
@@ -305,7 +306,7 @@ const TIPS = [
   ['🔊', 'Media volume full', 'Siren media volume pe bajta hai. Phone silent pe ho to bhi Android pe bajega, bas media volume upar rakho. iPhone me side ka silent switch band rakho.'],
   ['🔋', 'Charging pe lagao', 'Lagataar sunna battery khata hai. Travel me charging pe ya power bank ke saath best hai.'],
   ['📶', 'Internet nahi chahiye', 'Awaaz pehchanna pura phone pe hota hai. Recording kahin upload nahi hoti. Sirf "Mera phone bajao" button ke liye internet chahiye.'],
-  ['🗣️', 'Aapki awaaz', 'Alarm aapki apni 3 recordings se match karke bajta hai. Koi aur same phrase bole to bhi kabhi-kabhi baj sakta hai, ye bank-level security nahi hai.'],
+  ['🗣️', 'Aapki awaaz', 'Alarm aapki recording se thoda sa bhi milti-julti awaaz pe baj jata hai (sensitivity 8). Galti se zyada baje to slider kam karo, door se na pakde to badhao.'],
 ];
 
 export default function FindPhone() {
