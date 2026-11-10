@@ -14,6 +14,8 @@ const HOP = 160; // 10 ms
 const NFFT = 512;
 const NMEL = 26;
 const NCEP = 13; // c0 (loudness) is dropped below -> 12 coefficients per frame
+const TRIM_NATS = 4; // frames ~17 dB below the loudest one count as silence
+const DELTA_W = 2; // weight of the delta features vs the static ones
 
 // ---------- precomputed tables ----------
 const hamming = Float32Array.from({ length: FRAME }, (_, i) => 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (FRAME - 1)));
@@ -114,11 +116,19 @@ export function mfcc(samples) {
     }
     mels.push(logMel);
   }
-  // Floor everything ~22 dB below the loudest band: background hiss in quiet bands then looks
+  // Cut the quiet lead-in/tail: only the spoken part should be compared, otherwise two different
+  // phrases look alike just because both start and end with the same silence
+  const energy = mels.map((lm) => Math.log(lm.reduce((s, x) => s + Math.exp(x), 0) + 1e-10));
+  const loudest = Math.max(...energy);
+  let first = energy.findIndex((e) => e > loudest - TRIM_NATS);
+  let last = energy.length - 1 - [...energy].reverse().findIndex((e) => e > loudest - TRIM_NATS);
+  if (first < 0) [first, last] = [0, energy.length - 1];
+  const spoken = mels.slice(Math.max(0, first - 2), last + 3);
+  // Floor everything ~35 dB below the loudest band: background hiss in quiet bands then looks
   // the same whether the user was close (clean) or far away (noisy)
-  const floor = top - 5;
+  const floor = top - 8;
   const frames = [];
-  for (const logMel of mels) {
+  for (const logMel of spoken) {
     for (let m = 0; m < NMEL; m++) if (logMel[m] < floor) logMel[m] = floor;
     const c = new Float32Array(NCEP - 1);
     for (let i = 1; i < NCEP; i++) {
@@ -133,7 +143,18 @@ export function mfcc(samples) {
   const mean = new Float32Array(dim);
   for (const f of frames) for (let i = 0; i < dim; i++) mean[i] += f[i] / frames.length;
   for (const f of frames) for (let i = 0; i < dim; i++) f[i] -= mean[i];
-  return frames;
+  // Append "deltas" (how each coefficient is changing): captures the movement between sounds,
+  // which separates different words much better than the static shape alone
+  return frames.map((f, t) => {
+    const out = new Float32Array(dim * 2);
+    out.set(f);
+    const a = frames[Math.max(0, t - 2)];
+    const b = frames[Math.max(0, t - 1)];
+    const c = frames[Math.min(frames.length - 1, t + 1)];
+    const d = frames[Math.min(frames.length - 1, t + 2)];
+    for (let i = 0; i < dim; i++) out[dim + i] = DELTA_W * ((c[i] - b[i]) + 2 * (d[i] - a[i])) / 10;
+    return out;
+  });
 }
 
 /** Length-normalised DTW distance between two MFCC sequences (lower = more similar) */
@@ -158,7 +179,10 @@ export function dtw(a, b) {
         const x = ai[k] - bj[k];
         d += x * x;
       }
-      cur[j] = Math.sqrt(d) + Math.min(prev[j], cur[j - 1], prev[j - 1]);
+      // Symmetric step pattern: a diagonal step counts twice, so stretching one recording to
+      // "skip over" parts of the other is not cheaper than really matching them
+      d = Math.sqrt(d);
+      cur[j] = Math.min(prev[j] + d, cur[j - 1] + d, prev[j - 1] + 2 * d);
     }
     [prev, cur] = [cur, prev];
   }

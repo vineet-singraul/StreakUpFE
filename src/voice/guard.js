@@ -1,14 +1,18 @@
 // "Find my phone" guard: listens on the mic for the user's own call-out phrase and rings a loud alarm.
 // One instance per tab (module singleton) so it keeps listening while the user switches app tabs.
 import { SAMPLE_RATE, mfcc, resample, matchSegment, thresholdFor } from './matcher';
+import { isNativeApp, nativeAlarm } from './native';
 
 // ---------------- profile storage (per user, on this device only) ----------------
 const KEY = (userId) => `ht_findphone_${userId || 'me'}`;
+export const PROFILE_VERSION = 2;
 
 export function loadProfile(userId) {
   try {
     const raw = localStorage.getItem(KEY(userId));
-    return raw ? JSON.parse(raw) : null;
+    const p = raw ? JSON.parse(raw) : null;
+    // Older recordings used a different sound format: ask for a fresh recording instead of mis-matching
+    return p && p.v === PROFILE_VERSION ? p : null;
   } catch {
     return null;
   }
@@ -58,9 +62,91 @@ let segmentHandler = null; // receives each spoken segment (Float32Array @16 kHz
 
 /** Must be called from a click/tap the first time (browsers only allow sound after a user gesture) */
 export async function ensureAudio() {
+  // iPhone: "playback" audio is NOT muted by the side silent switch (Safari 16.4+)
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+  } catch {
+    /* not supported */
+  }
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
   if (ctx.state === 'suspended') await ctx.resume();
+  unlockSirenElement();
   return ctx;
+}
+
+// ---------------- siren as a real media file ----------------
+// An <audio> element plays as "media playback": on iPhone it ignores the silent switch, and on
+// Android ringer-silent / vibrate mode doesn't mute it (only the MEDIA volume matters).
+let sirenEl = null;
+
+function sirenWavUrl() {
+  const rate = 22050;
+  const secs = 2;
+  const n = rate * secs;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF');
+  v.setUint32(4, 36 + n * 2, true);
+  str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, 1, true); // mono
+  v.setUint32(24, rate, true);
+  v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  str(36, 'data');
+  v.setUint32(40, n * 2, true);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    // Wail 900 -> 1800 -> 900 Hz every second; square-ish tone cuts through noise
+    const f = 900 + 900 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t));
+    phase += (2 * Math.PI * f) / rate;
+    const s = Math.max(-1, Math.min(1, 2.2 * Math.sin(phase))) * 0.95;
+    v.setInt16(44 + i * 2, s * 32767, true);
+  }
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+
+// Browsers only let audio play later if it was started once from a tap: play it muted now.
+function unlockSirenElement() {
+  try {
+    if (!sirenEl) {
+      sirenEl = new Audio(sirenWavUrl());
+      sirenEl.loop = true;
+      sirenEl.preload = 'auto';
+      sirenEl.setAttribute('playsinline', '');
+    }
+    if (sirenEl.dataset.unlocked) return;
+    sirenEl.muted = true;
+    sirenEl
+      .play()
+      .then(() => {
+        sirenEl.pause();
+        sirenEl.currentTime = 0;
+        sirenEl.muted = false;
+        sirenEl.dataset.unlocked = '1';
+      })
+      .catch(() => {
+        sirenEl.muted = false;
+      });
+  } catch {
+    /* ignore */
+  }
+}
+
+async function playSirenElement() {
+  if (!sirenEl) unlockSirenElement();
+  sirenEl.muted = false;
+  sirenEl.volume = 1;
+  sirenEl.currentTime = 0;
+  await sirenEl.play();
+  return () => {
+    sirenEl.pause();
+    sirenEl.currentTime = 0;
+  };
 }
 
 export const micSupported = () => Boolean(navigator.mediaDevices?.getUserMedia && (window.AudioContext || window.webkitAudioContext));
@@ -71,7 +157,7 @@ function makeSegmenter(onSegment) {
   const PRE = 20; // keep 200 ms before speech starts
   const END_SILENCE = 40; // 400 ms of quiet ends the phrase (short gaps between words are fine)
   const MAX_FRAMES = 400; // 4 s max
-  const MIN_SPEECH = 30; // 300 ms min
+  const MIN_SPEECH = 20; // 200 ms min
   let noise = 0.004;
   let carry = new Float32Array(0);
   const pre = [];
@@ -92,8 +178,8 @@ function makeSegmenter(onSegment) {
       for (let i = 0; i < FR; i++) s += frame[i] * frame[i];
       const rms = Math.sqrt(s / FR);
       if (rms > peak) peak = rms;
-      const startT = Math.max(noise * 3.2, 0.006);
-      const stayT = Math.max(noise * 2, 0.004);
+      const startT = Math.max(noise * 2.5, 0.004);
+      const stayT = Math.max(noise * 1.6, 0.003);
 
       if (!speech) {
         pre.push(frame);
@@ -255,6 +341,7 @@ export async function startGuard(p) {
   window.__htNoReload = true; // don't let the auto-updater reload the app mid-guard
   set({ status: 'listening', last: null });
   keepScreenOn();
+  nativeAlarm.keepAwake(true);
   return true;
 }
 
@@ -273,6 +360,7 @@ export function stopGuard() {
   profile = null;
   window.__htNoReload = false;
   wakeLock?.release().catch(() => {});
+  nativeAlarm.keepAwake(false);
   wakeLock = null;
   set({ status: 'off', level: 0, wakeLock: false });
 }
@@ -334,11 +422,25 @@ export async function startAlarm(reason = 'test') {
   const resumeTo = mic ? 'listening' : 'off';
   segmentHandler = null; // the mic would hear the siren itself
   set({ status: 'alarm', alarmReason: reason, resumeTo });
+  if (isNativeApp) {
+    // Android app: native side pushes the volume to MAX and rings on the ALARM channel (works in silent mode)
+    nativeAlarm.start().then(() => {
+      if (state.status !== 'alarm') nativeAlarm.stop(); // STOP was tapped before it started
+    });
+  }
   try {
     await ensureAudio();
-    siren = startSiren();
   } catch {
-    siren = null; // sound blocked (no tap yet); vibration + screen still work
+    /* no tap yet */
+  }
+  try {
+    siren = await playSirenElement(); // media playback: survives silent/vibrate mode
+  } catch {
+    try {
+      siren = startSiren(); // fallback: Web Audio siren
+    } catch {
+      siren = null; // sound blocked; vibration + flashing screen still work
+    }
   }
   if (navigator.vibrate) {
     navigator.vibrate([800, 300, 800, 300, 800]);
@@ -352,6 +454,7 @@ export function stopAlarm(resume = true) {
   clearInterval(vibrateTimer);
   navigator.vibrate?.(0);
   siren?.();
+  if (isNativeApp) nativeAlarm.stop(); // also restores the user's volume
   siren = null;
   if (state.status !== 'alarm') return;
   if (resume && state.resumeTo === 'listening' && mic) {

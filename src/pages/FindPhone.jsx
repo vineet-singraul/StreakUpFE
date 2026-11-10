@@ -32,6 +32,7 @@ import {
   ensureAudio,
   loadProfile,
   micSupported,
+  PROFILE_VERSION,
   recordSample,
   saveProfile,
   startAlarm,
@@ -97,7 +98,7 @@ function VoiceSetup({ userId, profile, onSaved }) {
           setError('Recording saaf nahi aayi. Shaant jagah pe thoda zor se dobara bolo.');
           return;
         }
-        const p = { phrase: phrase.trim(), templates: packTemplates(templates), ...stats, sensitivity: profile?.sensitivity ?? DEFAULT_SENSITIVITY, createdAt: new Date().toISOString() };
+        const p = { v: PROFILE_VERSION, phrase: phrase.trim(), templates: packTemplates(templates), ...stats, sensitivity: profile?.sensitivity ?? DEFAULT_SENSITIVITY, createdAt: new Date().toISOString() };
         if (!saveProfile(userId, p)) throw new Error('Is browser me save nahi ho paya (storage band hai?)');
         setEditing(false);
         setSamples([]);
@@ -227,6 +228,12 @@ function GuardMode({ userId, profile, onChange }) {
         </Box>
       </Stack>
 
+      {guard.status === 'off' && (
+        <Alert severity="warning" icon={<span>🔊</span>}>
+          Guard ON karne se pehle phone ke <b>volume button</b> se <b>Media volume FULL</b> karo, phir "Alarm test karo" se check karo.
+          Phone silent/vibrate pe ho tab bhi siren bajega, bas media volume zero nahi hona chahiye.
+        </Alert>
+      )}
       {guard.error && <Alert severity="error">{guard.error}</Alert>}
       {guard.status === 'listening' && (
         <Alert severity={guard.wakeLock ? 'success' : 'warning'}>
@@ -303,7 +310,7 @@ function RemoteRing() {
 
 const TIPS = [
   ['📱', 'App khula rakho', 'Browser me mic tabhi sunta hai jab app khuli ho aur screen ON ho. Guard ON karte hi app screen ko band hone se rokti hai.'],
-  ['🔊', 'Media volume full', 'Siren media volume pe bajta hai. Phone silent pe ho to bhi Android pe bajega, bas media volume upar rakho. iPhone me side ka silent switch band rakho.'],
+  ['🔊', 'Media volume full', 'Phone silent ya vibrate pe ho tab bhi siren bajta hai (Android aur iPhone dono). Bas MEDIA volume full rakho: browser app khud system volume nahi badha sakti, ye phone ki security rule hai.'],
   ['🔋', 'Charging pe lagao', 'Lagataar sunna battery khata hai. Travel me charging pe ya power bank ke saath best hai.'],
   ['📶', 'Internet nahi chahiye', 'Awaaz pehchanna pura phone pe hota hai. Recording kahin upload nahi hoti. Sirf "Mera phone bajao" button ke liye internet chahiye.'],
   ['🗣️', 'Aapki awaaz', 'Alarm aapki recording se thoda sa bhi milti-julti awaaz pe baj jata hai (sensitivity 8). Galti se zyada baje to slider kam karo, door se na pakde to badhao.'],
@@ -341,12 +348,12 @@ export default function FindPhone() {
         </CardContent>
       </Card>
 
-      <Card variant="outlined">
+      {user && (<Card variant="outlined">
         <CardContent>
           <StepTitle n={3} title="Doosre device se bajao" />
           <RemoteRing />
         </CardContent>
-      </Card>
+      </Card>)}
 
       <Accordion variant="outlined" disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
