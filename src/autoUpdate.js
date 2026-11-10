@@ -4,6 +4,8 @@
 // checked on launch, whenever the app comes back to the foreground, and every 10 minutes.
 const CHECK_EVERY_MS = 10 * 60 * 1000;
 let pendingReload = false;
+// Find-phone guard is listening: a reload would silently switch the mic off
+const busy = () => Boolean(window.__htNoReload);
 
 const isTyping = () => {
   const el = document.activeElement;
@@ -16,7 +18,7 @@ async function check() {
     if (!res.ok) return;
     const { version } = await res.json();
     if (version && version !== __APP_VERSION__) {
-      if (document.visibilityState === 'visible' && !isTyping()) window.location.reload();
+      if (document.visibilityState === 'visible' && !isTyping() && !busy()) window.location.reload();
       else pendingReload = true;
     }
   } catch {
@@ -31,11 +33,11 @@ export function startAutoUpdate() {
   setInterval(check, CHECK_EVERY_MS);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
-    if (pendingReload) window.location.reload();
+    if (pendingReload && !busy()) window.location.reload();
     else check();
   });
   document.addEventListener('focusout', () => {
-    if (pendingReload && !isTyping()) window.location.reload();
+    if (pendingReload && !isTyping() && !busy()) window.location.reload();
   });
 
   // Keep the service worker itself fresh too

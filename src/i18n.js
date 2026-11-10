@@ -14,6 +14,7 @@ const D = {
   'nav.reports': ['AI Reports', 'AI रिपोर्ट', 'AI Reports'],
   'nav.challenge': ['Challenge', 'चैलेंज', 'Challenge'],
   'nav.rewards': ['Rewards', 'रिवॉर्ड्स', 'Rewards'],
+  'nav.findPhone': ['Find Phone', 'फ़ोन ढूँढें', 'Phone Dhundo'],
   'ch.newTitle': ['Start a new challenge', 'नया चैलेंज शुरू करें', 'Naya challenge shuru karo'],
   'ch.newSub': ['Choose 10 to 90 days, give it a title and write your rules (one per line). Tick them every day and earn points.', '10 से 90 दिन चुनें, टाइटल दें और अपने नियम लिखें (हर लाइन में एक)। रोज़ टिक करें और पॉइंट कमाएँ।', '10 se 90 din chuno, title do aur apne rules likho (har line me ek). Roz tick karo aur points kamao.'],
   'ch.name': ['Challenge name', 'चैलेंज का नाम', 'Challenge ka naam'],

@@ -14,6 +14,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
 const Rewards = lazy(() => import('./pages/Rewards'));
+const FindPhone = lazy(() => import('./pages/FindPhone'));
 const Admin = lazy(() => import('./pages/Admin'));
 
 const FullScreenLoader = () => (
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/reports" element={page(<Reports />)} />
         <Route path="/challenge" element={page(<Challenge />)} />
         <Route path="/rewards" element={page(<Rewards />)} />
+        <Route path="/find-phone" element={page(<FindPhone />)} />
         <Route path="/settings" element={page(<Settings />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

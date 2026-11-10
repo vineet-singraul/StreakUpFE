@@ -22,9 +22,11 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import LogoutIcon from '@mui/icons-material/Logout';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import PhonelinkRingIcon from '@mui/icons-material/PhonelinkRing';
 import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
 import NotifyBanner from './NotifyBanner';
+import FindPhoneAlarm from './FindPhoneAlarm';
 import { prefetch } from '../cache';
 import { useT } from '../i18n';
 
@@ -43,6 +45,7 @@ const NAV = [
   { label: 'nav.reports', path: '/reports', icon: <InsightsIcon /> },
   { label: 'nav.challenge', path: '/challenge', icon: <EmojiEventsIcon /> },
   { label: 'nav.rewards', path: '/rewards', icon: <WorkspacePremiumIcon /> },
+  { label: 'nav.findPhone', path: '/find-phone', icon: <PhonelinkRingIcon /> },
   { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
@@ -88,9 +91,17 @@ export default function Layout() {
                 color={active === i ? 'primary' : 'inherit'}
                 variant={active === i ? 'contained' : 'text'}
                 onClick={() => navigate(item.path)}
-                sx={{ opacity: active === i ? 1 : 0.8 }}
+                aria-label={t(item.label)}
+                title={t(item.label)}
+                sx={{
+                  opacity: active === i ? 1 : 0.8,
+                  whiteSpace: 'nowrap',
+                  // 7 tabs: icons only on small laptops, icon + name on wide screens
+                  minWidth: 0,
+                  '& .MuiButton-startIcon': { mr: { md: 0, lg: 1 } },
+                }}
               >
-                {t(item.label)}
+                <Box component="span" sx={{ display: { md: 'none', lg: 'inline' } }}>{t(item.label)}</Box>
               </Button>
             ))}
           </Box>
@@ -134,6 +145,7 @@ export default function Layout() {
       </Paper>
 
       <ReasonsDialog />
+      <FindPhoneAlarm />
     </Box>
   );
 }
