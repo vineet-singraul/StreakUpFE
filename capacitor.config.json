@@ -1,8 +1,0 @@
-{
-  "appId": "com.streakup.app",
-  "appName": "StreakUp",
-  "webDir": "dist",
-  "android": {
-    "allowMixedContent": false
-  }
-}

@@ -17,8 +17,6 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { useAuth } from '../AuthContext';
 import { errMsg } from '../api';
 import { useT } from '../i18n';
-import Button from '@mui/material/Button';
-import { isNativeApp } from '../voice/native';
 
 const FEATURES = [
   { icon: <CalendarMonthIcon />, text: 'login.f1' },
@@ -99,7 +97,6 @@ export default function Login() {
             <Typography color="text.secondary" sx={{ textAlign: 'center', mb: 3 }}>
               {mode === 'signin' ? t('login.welcome') : t('login.create')}
             </Typography>
-
             <Tabs value={mode} onChange={(_, v) => { setMode(v); setError(''); }} variant="fullWidth" sx={{ mb: 3 }}>
               <Tab value="signin" label="Sign In" />
               <Tab value="signup" label="Sign Up" />
@@ -137,13 +134,6 @@ export default function Login() {
                 {mode === 'signin' ? 'Sign Up' : 'Sign In'}
               </Box>
             </Typography>
-
-            {isNativeApp && (
-              // Android app: "Phone Dhundo" works fully offline, so it doesn't need a login
-              <Button fullWidth variant="outlined" sx={{ mt: 3 }} onClick={() => navigate('/find-phone')}>
-                📱 Bina login "Phone Dhundo" kholo
-              </Button>
-            )}
           </CardContent>
         </Card>
       </Box>

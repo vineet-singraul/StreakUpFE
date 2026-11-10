@@ -5,8 +5,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import LinearProgress from '@mui/material/LinearProgress';
 import { useAuth } from './AuthContext';
 import Layout from './components/Layout';
-import FindPhoneAlarm from './components/FindPhoneAlarm';
-import { isNativeApp } from './voice/native';
 
 // Each page is its own small chunk, loaded on first visit
 const Login = lazy(() => import('./pages/Login'));
@@ -16,7 +14,6 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
 const Rewards = lazy(() => import('./pages/Rewards'));
-const FindPhone = lazy(() => import('./pages/FindPhone'));
 const Admin = lazy(() => import('./pages/Admin'));
 
 const FullScreenLoader = () => (
@@ -51,18 +48,6 @@ export default function App() {
         element={user ? <Navigate to={user.isAdmin ? '/admin' : '/'} replace /> : <Suspense fallback={<FullScreenLoader />}><Login /></Suspense>}
       />
       <Route path="/admin" element={<AdminOnly><Admin /></AdminOnly>} />
-      {isNativeApp && !user && (
-        // Android app without login: Phone Dhundo still works (voice + alarm are fully on-device)
-        <Route
-          path="/find-phone"
-          element={
-            <Box sx={{ p: 2, pb: 4 }}>
-              <Suspense fallback={<LinearProgress />}><FindPhone /></Suspense>
-              <FindPhoneAlarm />
-            </Box>
-          }
-        />
-      )}
       <Route
         element={
           <Protected>
@@ -75,7 +60,6 @@ export default function App() {
         <Route path="/reports" element={page(<Reports />)} />
         <Route path="/challenge" element={page(<Challenge />)} />
         <Route path="/rewards" element={page(<Rewards />)} />
-        <Route path="/find-phone" element={page(<FindPhone />)} />
         <Route path="/settings" element={page(<Settings />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

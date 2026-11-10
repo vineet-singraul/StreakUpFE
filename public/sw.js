@@ -22,27 +22,6 @@ self.addEventListener('push', (event) => {
   } catch {
     data = { body: event.data && event.data.text() };
   }
-  if (data.type === 'find-phone') {
-    // "Ring my phone" from another device: loud, sticky notification + siren in any open app window
-    event.waitUntil(
-      Promise.all([
-        self.registration.showNotification(data.title || '📱 Phone yahan hai!', {
-          body: data.body || '',
-          icon: '/icon-192.png',
-          badge: '/icon-192.png',
-          tag: 'find-phone',
-          renotify: true,
-          requireInteraction: true,
-          vibrate: [800, 300, 800, 300, 800, 300, 800],
-          data: { url: '/find-phone' },
-        }),
-        self.clients
-          .matchAll({ type: 'window', includeUncontrolled: true })
-          .then((clients) => clients.forEach((c) => c.postMessage({ type: 'find-phone-ring' }))),
-      ]),
-    );
-    return;
-  }
   event.waitUntil(
     self.registration.showNotification(data.title || 'StreakUp', {
       body: data.body || '',
