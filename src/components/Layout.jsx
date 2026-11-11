@@ -25,6 +25,7 @@ import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
 import NotifyBanner from './NotifyBanner';
+import ChatBot from './ChatBot';
 import { prefetch } from '../cache';
 import { useT } from '../i18n';
 
@@ -134,6 +135,7 @@ export default function Layout() {
       </Paper>
 
       <ReasonsDialog />
+      <ChatBot />
     </Box>
   );
 }

@@ -177,6 +177,18 @@ const D = {
   'set.pushOff': ['Off for this device', 'इस डिवाइस पर बंद है', 'Is device par abhi OFF hai'],
   'set.gmail': ['Gmail reminders', 'Gmail रिमाइंडर', 'Gmail reminders'],
   'set.gmailSub': ['Reminders + 12 AM report to {email}', 'रिमाइंडर + 12 बजे की रिपोर्ट {email} पर', 'Reminder + 12 AM report {email} par'],
+  'chat.title': ['AI Assistant', 'AI असिस्टेंट', 'AI Assistant'],
+  'chat.sub': ['Ask anything about your tasks, habits & reports', 'अपने टास्क, हैबिट और रिपोर्ट के बारे में कुछ भी पूछें', 'Apne tasks, habits aur reports ke baare me kuch bhi poochho'],
+  'chat.empty': ['Hi! I read your data from the database and answer. Try:', 'नमस्ते! मैं डेटाबेस से आपका डेटा पढ़कर जवाब देता हूँ। ये आज़माएँ:', 'Hi! Main database se aapka data padh kar jawab deta hoon. Ye try karo:'],
+  'chat.placeholder': ['Ask a question…', 'सवाल पूछें…', 'Sawaal poochho…'],
+  'chat.thinking': ['Fetching data…', 'डेटा ला रहा हूँ…', 'Data la raha hoon…'],
+  'chat.clear': ['Clear chat', 'चैट साफ़ करें', 'Chat clear karo'],
+  'chat.showQuery': ['Show DB query', 'DB क्वेरी देखें', 'DB query dekho'],
+  'chat.hideQuery': ['Hide query', 'क्वेरी छुपाएँ', 'Query chhupao'],
+  'chat.s1': ["What's pending today?", 'आज क्या बाकी है?', 'Aaj kya pending hai?'],
+  'chat.s2': ['How many tasks did I finish this week?', 'इस हफ्ते कितने टास्क पूरे किए?', 'Is hafte kitne tasks complete kiye?'],
+  'chat.s3': ['Which habit did I do most this month?', 'इस महीने कौन सी हैबिट सबसे ज़्यादा की?', 'Is mahine kaunsi habit sabse zyada ki?'],
+  'chat.s4': ['My completion % for the last 7 days', 'पिछले 7 दिनों का completion %', 'Last 7 din ka completion %'],
   'set.test': ['Send a test reminder now', 'अभी टेस्ट रिमाइंडर भेजें', 'Abhi test reminder bhejo'],
 };
 
