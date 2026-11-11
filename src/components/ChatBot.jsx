@@ -164,6 +164,7 @@ export default function ChatBot() {
             <Box sx={{ textAlign: 'center', mt: 3 }}>
               <SmartToyIcon sx={{ fontSize: 48, color: 'primary.main', opacity: 0.8 }} />
               <Typography sx={{ mt: 1, mb: 2 }} color="text.secondary">{t('chat.empty')}</Typography>
+              <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 2 }}>{t('chat.notice')}</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
                 {suggestions.map((s) => (
                   <Chip key={s} label={s} onClick={() => send(s)} variant="outlined" color="primary" />

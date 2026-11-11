@@ -49,6 +49,8 @@ import LoginIcon from '@mui/icons-material/Login';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ForumIcon from '@mui/icons-material/Forum';
+import AdminChats from '../components/AdminChats';
 import { useAuth } from '../AuthContext';
 import api, { errMsg } from '../api';
 import { useAddress } from '../geocode';
@@ -476,6 +478,7 @@ const SECTIONS = [
   { label: 'Users', icon: <PeopleIcon /> },
   { label: 'Locations', icon: <PlaceIcon /> },
   { label: 'Location Tracker', icon: <MyLocationIcon /> },
+  { label: 'Chats', icon: <ForumIcon /> },
 ];
 
 // Leaflet is only downloaded when the admin opens this tab
@@ -573,6 +576,7 @@ export default function Admin() {
                 <LocationTracker />
               </Suspense>
             )}
+            {tab === 4 && <AdminChats users={users} confirm={setConfirmReq} />}
           </>
         )}
       </Container>

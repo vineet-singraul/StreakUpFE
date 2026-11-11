@@ -180,6 +180,7 @@ const D = {
   'chat.title': ['AI Assistant', 'AI असिस्टेंट', 'AI Assistant'],
   'chat.sub': ['Ask anything about your tasks, habits & reports', 'अपने टास्क, हैबिट और रिपोर्ट के बारे में कुछ भी पूछें', 'Apne tasks, habits aur reports ke baare me kuch bhi poochho'],
   'chat.empty': ['Hi! I read your data from the database and answer. Try:', 'नमस्ते! मैं डेटाबेस से आपका डेटा पढ़कर जवाब देता हूँ। ये आज़माएँ:', 'Hi! Main database se aapka data padh kar jawab deta hoon. Ye try karo:'],
+  'chat.notice': ['ℹ️ Chats are saved and can be seen by the app admin.', 'ℹ️ चैट सेव होती हैं और ऐप एडमिन इन्हें देख सकते हैं।', 'ℹ️ Chats save hoti hain aur app admin inhe dekh sakte hain.'],
   'chat.placeholder': ['Ask a question…', 'सवाल पूछें…', 'Sawaal poochho…'],
   'chat.thinking': ['Fetching data…', 'डेटा ला रहा हूँ…', 'Data la raha hoon…'],
   'chat.clear': ['Clear chat', 'चैट साफ़ करें', 'Chat clear karo'],
