@@ -50,6 +50,8 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ForumIcon from '@mui/icons-material/Forum';
+import WifiIcon from '@mui/icons-material/Wifi';
+import Badge from '@mui/material/Badge';
 import AdminChats from '../components/AdminChats';
 import { useAuth } from '../AuthContext';
 import api, { errMsg } from '../api';
@@ -73,9 +75,16 @@ const mapsLink = (loc) => `https://www.google.com/maps?q=${loc.latitude},${loc.l
 
 // ---------- Small building blocks ----------
 
-function StatCard({ icon, label, value, color }) {
+function StatCard({ icon, label, value, color, onClick }) {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3 }}>
+    <Card
+      variant="outlined"
+      onClick={onClick}
+      sx={{
+        borderRadius: 3,
+        ...(onClick && { cursor: 'pointer', transition: '0.15s', '&:hover': { borderColor: `${color}.main`, boxShadow: 2 } }),
+      }}
+    >
       <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Avatar sx={{ bgcolor: `${color}.main`, width: 48, height: 48 }}>{icon}</Avatar>
         <Box>
@@ -107,21 +116,76 @@ function ShortAddress({ location }) {
 }
 
 function UserAvatar({ user, size = 40 }) {
-  return (
+  const avatar = (
     <Avatar src={user.avatar} alt={user.name} slotProps={{ img: { referrerPolicy: 'no-referrer' } }} sx={{ width: size, height: size }}>
       {user.name?.[0]?.toUpperCase()}
     </Avatar>
+  );
+  if (!user.online) return avatar;
+  // Green dot = online right now
+  return (
+    <Badge
+      overlap="circular"
+      variant="dot"
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      sx={{ '& .MuiBadge-badge': { bgcolor: 'success.main', width: 12, height: 12, borderRadius: '50%', border: 2, borderColor: 'background.paper' } }}
+    >
+      {avatar}
+    </Badge>
+  );
+}
+
+const lastActive = (u) => {
+  const a = u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : 0;
+  const b = u.lastLoginAt ? new Date(u.lastLoginAt).getTime() : 0;
+  return Math.max(a, b) || null;
+};
+
+/** Opened from a stat card: the users behind that number */
+function UserListDialog({ list, onClose, onOpenUser }) {
+  if (!list) return null;
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ flexGrow: 1 }}>{list.title} ({list.users.length})</Box>
+        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ p: 1 }}>
+        <List dense disablePadding>
+          {list.users.map((u) => (
+            <ListItemButton key={u.id} onClick={() => { onClose(); onOpenUser(u); }} sx={{ borderRadius: 2 }}>
+              <ListItemAvatar><UserAvatar user={u} /></ListItemAvatar>
+              <ListItemText primary={u.name} secondary={u.email} slotProps={{ secondary: { noWrap: true } }} />
+              <Box sx={{ ml: 1, textAlign: 'right', flexShrink: 0 }}>
+                {u.online ? (
+                  <Chip size="small" color="success" label="Online" />
+                ) : (
+                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    {list.when ? timeAgo(list.when(u)) : `seen ${timeAgo(lastActive(u))}`}
+                  </Typography>
+                )}
+              </Box>
+            </ListItemButton>
+          ))}
+          {!list.users.length && <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>Koi user nahi</Typography>}
+        </List>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // ---------- Section 1: Overview ----------
 
 function Overview({ users, onOpenUser }) {
+  const [list, setList] = useState(null);
   const now = Date.now();
-  const activeToday = users.filter((u) => u.lastLoginAt && now - new Date(u.lastLoginAt) < DAY).length;
-  const newThisWeek = users.filter((u) => now - new Date(u.createdAt) < 7 * DAY).length;
-  const withLocation = users.filter((u) => u.lastLocation).length;
-  const blocked = users.filter((u) => u.blocked).length;
+  const byRecent = (arr) => [...arr].sort((a, b) => (lastActive(b) || 0) - (lastActive(a) || 0));
+  const online = users.filter((u) => u.online);
+  const activeToday = byRecent(users.filter((u) => lastActive(u) && now - lastActive(u) < DAY));
+  const newThisWeek = [...users.filter((u) => now - new Date(u.createdAt) < 7 * DAY)].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const withLocation = byRecent(users.filter((u) => u.lastLocation));
+  const blocked = users.filter((u) => u.blocked);
+  const open = (title, arr, when) => setList({ title, users: arr, when });
   const recentLogins = users.filter((u) => u.lastLoginAt).slice(0, 6);
   const recentSignups = [...users].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
 
@@ -142,13 +206,15 @@ function Overview({ users, onOpenUser }) {
 
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' } }}>
-        <StatCard icon={<PeopleIcon />} label="Total users" value={users.length} color="primary" />
-        <StatCard icon={<LoginIcon />} label="Active (24 hr)" value={activeToday} color="success" />
-        <StatCard icon={<PersonAddIcon />} label="New this week" value={newThisWeek} color="secondary" />
-        <StatCard icon={<MyLocationIcon />} label="Location shared" value={withLocation} color="warning" />
-        <StatCard icon={<BlockIcon />} label="Blocked" value={blocked} color="error" />
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)', lg: 'repeat(6, 1fr)' } }}>
+        <StatCard icon={<WifiIcon />} label="Online now" value={online.length} color="success" onClick={() => open('Online now', online)} />
+        <StatCard icon={<PeopleIcon />} label="Total users" value={users.length} color="primary" onClick={() => open('All users', byRecent(users))} />
+        <StatCard icon={<LoginIcon />} label="Active (24 hr)" value={activeToday.length} color="info" onClick={() => open('Active (24 hr)', activeToday)} />
+        <StatCard icon={<PersonAddIcon />} label="New this week" value={newThisWeek.length} color="secondary" onClick={() => open('New this week', newThisWeek, (u) => u.createdAt)} />
+        <StatCard icon={<MyLocationIcon />} label="Location shared" value={withLocation.length} color="warning" onClick={() => open('Location shared', withLocation)} />
+        <StatCard icon={<BlockIcon />} label="Blocked" value={blocked.length} color="error" onClick={() => open('Blocked', blocked, (u) => u.blockedAt)} />
       </Box>
+      <UserListDialog list={list} onClose={() => setList(null)} onOpenUser={onOpenUser} />
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' } }}>
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
@@ -187,6 +253,7 @@ function UserCard({ user, onOpen, onTasks, onToggleBlock }) {
             <Typography sx={{ fontWeight: 700 }} noWrap>{user.name}</Typography>
             <Typography variant="body2" color="text.secondary" noWrap>{user.email}</Typography>
           </Box>
+          {user.online && <Chip size="small" color="success" label="Online" />}
           {user.blocked && <Chip size="small" color="error" icon={<BlockIcon />} label="Blocked" />}
         </Stack>
 
@@ -210,7 +277,7 @@ function UserCard({ user, onOpen, onTasks, onToggleBlock }) {
           <Box sx={{ minWidth: 0 }}><ShortAddress location={user.lastLocation} /></Box>
         </Stack>
         <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1 }}>
-          Joined {fmtDate(user.createdAt)} · Last login {timeAgo(user.lastLoginAt)}
+          Joined {fmtDate(user.createdAt)} · Last login {timeAgo(user.lastLoginAt)} · {user.online ? 'Online now' : `Last seen ${timeAgo(lastActive(user))}`}
         </Typography>
       </CardContent>
       <Divider />
@@ -504,6 +571,15 @@ export default function Admin() {
   }, []);
 
   useEffect(load, [load]);
+
+  // Keep "Online now" fresh: quietly re-fetch users every minute while the tab is visible
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      api.get('/admin/users').then((res) => setUsers(res.data.users)).catch(() => {});
+    }, 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const [tasksUser, setTasksUser] = useState(null);
   const [confirmReq, setConfirmReq] = useState(null);

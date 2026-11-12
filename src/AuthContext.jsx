@@ -86,6 +86,9 @@ export function AuthProvider({ children }) {
   }, [setUser]);
 
   const logout = useCallback(() => {
+    // Tell the server we're offline (token passed explicitly: it's removed from storage right below)
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) api.post('/auth/logout', null, { headers: { Authorization: `Bearer ${token}` }, __retry: 99 }).catch(() => {});
     resetTracking();
     localStorage.removeItem(TOKEN_KEY);
     clearCache();

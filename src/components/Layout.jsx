@@ -26,6 +26,7 @@ import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
 import NotifyBanner from './NotifyBanner';
 import ChatBot from './ChatBot';
+import api from '../api';
 import { prefetch } from '../cache';
 import { useT } from '../i18n';
 
@@ -62,6 +63,18 @@ export default function Layout() {
   const { pathname } = useLocation();
   const [anchor, setAnchor] = useState(null);
   const active = activeIndex(pathname);
+
+  // Heartbeat so the admin panel can show who is online right now
+  useEffect(() => {
+    const ping = () => document.visibilityState === 'visible' && api.post('/auth/ping').catch(() => {});
+    ping();
+    const id = setInterval(ping, 2 * 60 * 1000);
+    document.addEventListener('visibilitychange', ping);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', ping);
+    };
+  }, []);
 
   useEffect(() => {
     const id = (window.requestIdleCallback || ((cb) => setTimeout(cb, 300)))(warmUp);
