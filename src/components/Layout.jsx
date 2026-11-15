@@ -11,9 +11,7 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Container from '@mui/material/Container';
-import Paper from '@mui/material/Paper';
-import BottomNavigation from '@mui/material/BottomNavigation';
-import BottomNavigationAction from '@mui/material/BottomNavigationAction';
+import ButtonBase from '@mui/material/ButtonBase';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import TodayIcon from '@mui/icons-material/Today';
 import InsightsIcon from '@mui/icons-material/Insights';
@@ -22,6 +20,14 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import LogoutIcon from '@mui/icons-material/Logout';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
+import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
+import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined';
+import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import { BRAND_GRADIENT } from '../theme';
 import { useAuth } from '../AuthContext';
 import ReasonsDialog from './ReasonsDialog';
 import NotifyBanner from './NotifyBanner';
@@ -40,12 +46,12 @@ function warmUp() {
 }
 
 const NAV = [
-  { label: 'nav.calendar', path: '/', icon: <CalendarMonthIcon /> },
-  { label: 'nav.today', path: '/day/today', icon: <TodayIcon /> },
-  { label: 'nav.reports', path: '/reports', icon: <InsightsIcon /> },
-  { label: 'nav.challenge', path: '/challenge', icon: <EmojiEventsIcon /> },
-  { label: 'nav.rewards', path: '/rewards', icon: <WorkspacePremiumIcon /> },
-  { label: 'nav.settings', path: '/settings', icon: <SettingsIcon /> },
+  { label: 'nav.calendar', path: '/', icon: <CalendarMonthOutlinedIcon />, activeIcon: <CalendarMonthIcon /> },
+  { label: 'nav.today', path: '/day/today', icon: <EventAvailableOutlinedIcon />, activeIcon: <EventAvailableIcon /> },
+  { label: 'nav.reports', short: 'nav.reportsShort', path: '/reports', icon: <ShowChartIcon />, activeIcon: <InsightsIcon /> },
+  { label: 'nav.challenge', path: '/challenge', icon: <EmojiEventsOutlinedIcon />, activeIcon: <EmojiEventsIcon /> },
+  { label: 'nav.rewards', path: '/rewards', icon: <WorkspacePremiumOutlinedIcon />, activeIcon: <WorkspacePremiumIcon /> },
+  { label: 'nav.settings', path: '/settings', icon: <SettingsOutlinedIcon />, activeIcon: <SettingsIcon /> },
 ];
 
 // Derive the active tab from the URL by matching NAV paths, so adding/reordering
@@ -82,7 +88,7 @@ export default function Layout() {
   }, []);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 10, md: 4 } }}>
+    <Box sx={{ minHeight: '100vh', pb: { xs: 12, md: 4 } }}>
       <AppBar position="sticky" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Toolbar sx={{ gap: 1 }}>
           <TaskAltIcon color="primary" />
@@ -134,18 +140,61 @@ export default function Layout() {
         <Outlet />
       </Container>
 
-      {/* Mobile bottom navigation */}
-      <Paper
-        elevation={8}
-        sx={{ display: { xs: 'block', md: 'none' }, position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1100 }}
+      {/* Mobile bottom navigation: the tapped tab rises into a gradient circle (moves to whichever tab is open) */}
+      <Box
+        component="nav"
+        sx={{
+          display: { xs: 'flex', md: 'none' },
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1100,
+          alignItems: 'flex-end',
+          px: 0.25, pt: 1,
+          pb: 'calc(8px + env(safe-area-inset-bottom))',
+          bgcolor: 'rgba(255,255,255,.85)',
+          '@media (prefers-color-scheme: dark)': { bgcolor: 'rgba(16,18,36,.88)' },
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderTop: 1, borderColor: 'divider',
+          borderRadius: '22px 22px 0 0',
+        }}
       >
-        <BottomNavigation value={active} onChange={(_, i) => navigate(NAV[i].path)}>
-          {NAV.map((item) => (
-            // Icons only on mobile; the name stays available to screen readers
-            <BottomNavigationAction key={item.path} aria-label={t(item.label)} icon={item.icon} sx={{ minWidth: 0 }} />
-          ))}
-        </BottomNavigation>
-      </Paper>
+        {NAV.map((item, i) => {
+          const on = active === i;
+          return (
+            <ButtonBase
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              aria-label={t(item.label)}
+              aria-current={on ? 'page' : undefined}
+              sx={{
+                flex: 1, minWidth: 0, flexDirection: 'column', gap: 0.5, borderRadius: 3,
+                color: on ? 'text.primary' : 'text.secondary',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {/* icon holder: small & plain normally, big raised gradient circle when this tab is open */}
+              <Box
+                sx={{
+                  width: on ? 56 : 32, height: on ? 56 : 32,
+                  mt: on ? '-30px' : 0,
+                  borderRadius: '50%', display: 'grid', placeItems: 'center',
+                  color: on ? '#fff' : 'inherit',
+                  background: on ? BRAND_GRADIENT : 'transparent',
+                  border: on ? '5px solid' : '0px solid',
+                  borderColor: 'background.default',
+                  boxShadow: on ? '0 8px 22px rgba(124,58,237,.45)' : 'none',
+                  transition: 'width .3s cubic-bezier(.34,1.56,.64,1), height .3s cubic-bezier(.34,1.56,.64,1), margin .3s cubic-bezier(.34,1.56,.64,1), background .3s ease, box-shadow .3s ease',
+                  '& svg': { fontSize: on ? 26 : 23, transition: 'font-size .3s ease' },
+                }}
+              >
+                {on ? item.activeIcon : item.icon}
+              </Box>
+              <Typography noWrap sx={{ fontSize: 10, fontWeight: on ? 700 : 500, maxWidth: '100%', lineHeight: 1.2, letterSpacing: '-0.1px' }}>
+                {t(item.short || item.label)}
+              </Typography>
+            </ButtonBase>
+          );
+        })}
+      </Box>
 
       <ReasonsDialog />
       <ChatBot />

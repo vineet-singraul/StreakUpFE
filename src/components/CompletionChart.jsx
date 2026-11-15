@@ -21,17 +21,13 @@ const HEIGHT = 200;
 const M = { top: 12, right: 8, bottom: 26, left: 40 };
 const TICKS = [0, 50, 100];
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const pctOf = (d) => (d.total ? Math.round((d.done / d.total) * 100) : null);
 
 function weekday(date) {
   const [y, m, d] = date.split('-').map(Number);
   return WEEKDAY[new Date(y, m - 1, d).getDay()];
-}
-
-function shortDate(date) {
-  const [y, m, d] = date.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
 /** Column path with a 4px rounded data-end and a square baseline */
@@ -85,11 +81,11 @@ export default function CompletionChart({ title, days, today, loading }) {
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 1, mb: 1 }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6">{title}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {avg === null
-                ? t('chart.sub')
-                : t('chart.summary', { avg, n: tracked.length, best: pctOf(best), date: shortDate(best.date) })}
-            </Typography>
+            {avg !== null && (
+              <Typography variant="body2" color="text.secondary">
+                {t('chart.summary', { avg, best: pctOf(best) })}
+              </Typography>
+            )}
           </Box>
           <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)}>
             <ToggleButton value="chart" aria-label="Chart view"><BarChartIcon fontSize="small" /></ToggleButton>
@@ -100,25 +96,47 @@ export default function CompletionChart({ title, days, today, loading }) {
         {loading && !days ? (
           <Skeleton variant="rounded" height={HEIGHT} />
         ) : view === 'table' ? (
-          <Box sx={{ maxHeight: HEIGHT + 40, overflowY: 'auto' }}>
-            <Table size="small" stickyHeader>
+          <Box sx={{ maxHeight: HEIGHT + 40, overflowY: 'auto', mx: -1 }}>
+            <Table
+              size="small"
+              stickyHeader
+              sx={{
+                tableLayout: 'fixed',
+                '& td, & th': { px: 1, py: 0.9, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', borderColor: 'divider' },
+                '& th': { fontSize: 12, color: 'text.secondary', fontWeight: 600, bgcolor: 'background.paper' },
+              }}
+            >
               <TableHead>
                 <TableRow>
                   <TableCell>{t('chart.date')}</TableCell>
-                  <TableCell align="right">{t('chart.done')}</TableCell>
-                  <TableCell align="right">{t('chart.total')}</TableCell>
-                  <TableCell align="right">%</TableCell>
+                  <TableCell align="center" sx={{ width: 64 }}>{t('chart.done')}</TableCell>
+                  <TableCell sx={{ width: { xs: 110, sm: 160 } }}>%</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(days || []).filter((d) => !today || d.date <= today).slice().reverse().map((d) => (
-                  <TableRow key={d.date}>
-                    <TableCell>{weekday(d.date)}, {prettyDate(d.date)}</TableCell>
-                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{d.done}</TableCell>
-                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{d.total}</TableCell>
-                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{pctOf(d) === null ? '–' : `${pctOf(d)}%`}</TableCell>
-                  </TableRow>
-                ))}
+                {(days || []).filter((d) => !today || d.date <= today).slice().reverse().map((d) => {
+                  const p = pctOf(d);
+                  const empty = p === null;
+                  return (
+                    <TableRow key={d.date} sx={{ opacity: empty ? 0.5 : 1 }}>
+                      {/* short date on one line: "Mon, 16 Nov" */}
+                      <TableCell sx={{ fontWeight: d.date === today ? 700 : 400 }}>
+                        {weekday(d.date)}, {Number(d.date.slice(8))} {MONTHS[Number(d.date.slice(5, 7)) - 1]}
+                      </TableCell>
+                      <TableCell align="center">{empty ? '–' : `${d.done}/${d.total}`}</TableCell>
+                      <TableCell>
+                        {empty ? '–' : (
+                          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                            <Box sx={{ flexGrow: 1, height: 6, borderRadius: 3, bgcolor: 'action.hover', overflow: 'hidden' }}>
+                              <Box sx={{ width: `${p}%`, height: '100%', borderRadius: 3, bgcolor: p === 100 ? 'success.main' : p >= 50 ? 'warning.main' : 'error.main' }} />
+                            </Box>
+                            <Typography variant="body2" sx={{ width: 36, textAlign: 'right', fontWeight: 600 }}>{p}%</Typography>
+                          </Stack>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </Box>

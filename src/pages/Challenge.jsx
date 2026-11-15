@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -39,7 +39,7 @@ import { useToast } from '../Toast';
 import { useT } from '../i18n';
 import { prettyDate } from '../utils';
 
-const SAMPLE = 'Wake up 5 AM\nWorkout 45 min\nNo junk food\nRead 10 pages\n3L water\nNo social media before 9 PM\nSleep by 10:30 PM';
+const SAMPLE = 'Wake up 5 AM\nWorkout 45 min\nRead 10 pages';
 const HERO_BG = 'linear-gradient(135deg, #f97316 0%, #ec4899 55%, #8b5cf6 100%)';
 
 /* ---------- start form ---------- */
@@ -48,17 +48,18 @@ function StartForm({ onStarted, onHistory, onCancel }) {
   const toast = useToast();
   const [days, setDays] = useState('');
   const [title, setTitle] = useState('');
-  const [rules, setRules] = useState(SAMPLE);
+  const [rules, setRules] = useState('');
   const [busy, setBusy] = useState(false);
   const [touched, setTouched] = useState(false);
 
   const daysNum = Number(days);
-  const daysError = !Number.isInteger(daysNum) || daysNum < 10 || daysNum > 90;
+  const daysError = !Number.isInteger(daysNum) || daysNum < 9 || daysNum > 145;
   const titleError = !title.trim();
+  const rulesError = !rules.trim();
 
   const start = async () => {
     setTouched(true);
-    if (daysError || titleError) return;
+    if (daysError || titleError || rulesError) return;
     setBusy(true);
     try {
       const { data } = await api.post('/challenge', { days: daysNum, title: title.trim(), items: rules.split('\n') });
@@ -73,36 +74,46 @@ function StartForm({ onStarted, onHistory, onCancel }) {
 
   return (
     <Card sx={{ maxWidth: 680, mx: 'auto', overflow: 'hidden' }}>
-      <Box sx={{ background: HERO_BG, color: '#fff', p: { xs: 2.5, sm: 3 } }}>
-        <EmojiEventsIcon sx={{ fontSize: 40 }} />
-        <Typography variant="h5" sx={{ mt: 1 }}>{t('ch.newTitle')}</Typography>
-        <Typography sx={{ opacity: 0.9 }}>{t('ch.newSub')}</Typography>
-      </Box>
+      {/* compact header: icon + title only */}
+      <Stack direction="row" spacing={1.5} sx={{ background: HERO_BG, color: '#fff', px: 2.5, py: 2, alignItems: 'center' }}>
+        <EmojiEventsIcon sx={{ fontSize: 30 }} />
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>{t('ch.newTitle')}</Typography>
+      </Stack>
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          {/* days + name on one line, even on phones; messages only when something is wrong */}
+          <Stack direction="row" spacing={1.5}>
             <TextField
               label={t('ch.days')}
               type="number"
-              required
               value={days}
               onChange={(e) => setDays(e.target.value)}
+              placeholder="9–145"
               error={touched && daysError}
-              helperText={touched && daysError ? t('ch.daysError') : t('ch.daysHelp')}
-              slotProps={{ htmlInput: { min: 10, max: 90, inputMode: 'numeric' } }}
-              sx={{ width: { xs: '100%', sm: 180 }, flexShrink: 0 }}
+              helperText={touched && daysError ? '9–145' : undefined}
+              slotProps={{ htmlInput: { min: 9, max: 145, inputMode: 'numeric' }, inputLabel: { shrink: true } }}
+              sx={{ width: 96, flexShrink: 0 }}
             />
             <TextField
               label={t('ch.name')}
-              required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               error={touched && titleError}
-              helperText={touched && titleError ? t('ch.titleError') : ' '}
+              helperText={touched && titleError ? t('ch.titleError') : undefined}
               fullWidth
             />
           </Stack>
-          <TextField label={t('ch.rules')} helperText={t('ch.rulesHelp')} value={rules} onChange={(e) => setRules(e.target.value)} multiline minRows={6} fullWidth />
+          <TextField
+            label={t('ch.rules')}
+            value={rules}
+            onChange={(e) => setRules(e.target.value)}
+            placeholder={SAMPLE}
+            error={touched && rulesError}
+            multiline
+            minRows={4}
+            slotProps={{ inputLabel: { shrink: true } }}
+            fullWidth
+          />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
             <Button variant="contained" size="large" startIcon={<EmojiEventsIcon />} onClick={start} disabled={busy} sx={{ flexGrow: 1 }}>
               {t('ch.start')}
@@ -116,18 +127,25 @@ function StartForm({ onStarted, onHistory, onCancel }) {
   );
 }
 
-/* ---------- 30-day grid (editable today column when onToggle is given) ---------- */
+/* ---------- day grid, 9-145 days (editable today column when onToggle is given) ---------- */
 function ChallengeGrid({ c, onToggle }) {
   const t = useT();
   const days = Array.from({ length: c.days }, (_, i) => i + 1);
+  const scroller = useRef(null);
+  // Long challenges are wide: open the grid scrolled so today's column is in view
+  useEffect(() => {
+    const box = scroller.current;
+    const cell = box?.querySelector(`[data-day="${Math.min(c.today, c.days)}"]`);
+    if (box && cell) box.scrollLeft = Math.max(0, cell.offsetLeft - box.clientWidth / 2);
+  }, [c.today, c.days]);
   return (
-    <Box sx={{ overflowX: 'auto', borderRadius: 2, border: 1, borderColor: 'divider' }}>
+    <Box ref={scroller} sx={{ overflowX: 'auto', borderRadius: 2, border: 1, borderColor: 'divider' }}>
       <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
         <thead>
           <tr>
             <Box component="th" sx={stickyCol(true)}>{t('ch.rule')}</Box>
             {days.map((d) => (
-              <Box component="th" key={d} sx={{ ...headCell, color: d === c.today && c.active ? 'primary.main' : 'text.secondary', fontWeight: d === c.today && c.active ? 800 : 600 }}>
+              <Box component="th" key={d} data-day={d} sx={{ ...headCell, color: d === c.today && c.active ? 'primary.main' : 'text.secondary', fontWeight: d === c.today && c.active ? 800 : 600 }}>
                 {d}
               </Box>
             ))}
@@ -213,9 +231,9 @@ export function ChallengeLineChart({ c }) {
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.day)},${y(p.pct)}`).join(' ');
   const area = pts.length ? `${line} L${x(pts.at(-1).day)},${y(0)} L${x(1)},${y(0)} Z` : '';
   const avg = pts.length ? Math.round(pts.reduce((s, p) => s + p.pct, 0) / pts.length) : 0;
-  // smallest label step whose labels are >= 40px apart (works from 10 to 90 days)
+  // smallest label step whose labels are >= 40px apart (works from 9 to 145 days)
   const gap = innerW / Math.max(c.days - 1, 1);
-  const step = [1, 5, 10, 15, 30].find((s) => s * gap >= 40) || 30;
+  const step = [1, 5, 10, 15, 30, 50].find((s) => s * gap >= 40) || 50;
   const hp = hover ? pts[hover - 1] : null;
 
   const onMove = (e) => {

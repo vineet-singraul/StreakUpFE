@@ -15,6 +15,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
 const Rewards = lazy(() => import('./pages/Rewards'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Install = lazy(() => import('./pages/Install'));
 
 const FullScreenLoader = () => (
   <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
@@ -47,6 +48,7 @@ export default function App() {
         path="/login"
         element={user ? <Navigate to={user.isAdmin ? '/admin' : '/'} replace /> : <Suspense fallback={<FullScreenLoader />}><Login /></Suspense>}
       />
+      <Route path="/install" element={<Suspense fallback={<FullScreenLoader />}><Install /></Suspense>} />
       <Route path="/admin" element={<AdminOnly><Admin /></AdminOnly>} />
       <Route
         element={

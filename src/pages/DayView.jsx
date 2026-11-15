@@ -381,7 +381,7 @@ export default function DayView() {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ mb: 1 }}>{t('day.aiTitle')}</Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" noWrap title={t('day.aiInfo')} sx={{ mb: 2 }}>
                 {t('day.aiInfo')}
               </Typography>
               <Button

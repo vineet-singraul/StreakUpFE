@@ -29,22 +29,19 @@ export default function Reports() {
   ];
 
   return (
-    <Stack spacing={{ xs: 2, md: 3 }}>
-      <Box>
-        <Typography variant="h5">{t('nav.reports')}</Typography>
-        <Typography color="text.secondary">{t('reports.sub')}</Typography>
-      </Box>
+    <Stack spacing={2}>
+      <Typography variant="h5">{t('nav.reports')}</Typography>
 
       {!data.aiEnabled && (
-        <Alert severity="warning">{t('reports.noAi')}</Alert>
+        <Alert severity="warning" sx={{ py: 0 }}>{t('reports.noAi')}</Alert>
       )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
         {stats.map(([label, value]) => (
           <Card key={label}>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">{label}</Typography>
-              <Typography variant="h5">{value}</Typography>
+            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>{value}</Typography>
+              <Typography variant="caption" color="text.secondary">{label}</Typography>
             </CardContent>
           </Card>
         ))}

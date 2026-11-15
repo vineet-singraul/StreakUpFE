@@ -1,20 +1,23 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Skeleton from '@mui/material/Skeleton';
-import Tooltip from '@mui/material/Tooltip';
-import LockIcon from '@mui/icons-material/Lock';
 import { useApi } from '../cache';
 import { useAuth } from '../AuthContext';
 import MonthCalendar from '../components/MonthCalendar';
 import TodaySummary from '../components/TodaySummary';
+import TodayHabits from '../components/TodayHabits';
+
+const greetingKey = () => {
+  const h = new Date().getHours();
+  return h < 5 ? 'dash.night' : h < 12 ? 'dash.morning' : h < 17 ? 'dash.afternoon' : h < 21 ? 'dash.evening' : 'dash.night';
+};
+const longDate = (date) => {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' });
+};
 import { useT } from '../i18n';
 import TrendLineChart from '../components/TrendLineChart';
 import { daysInMonth, monthLabel, pad } from '../utils';
@@ -52,92 +55,42 @@ export default function Dashboard() {
   const [params, setParams] = useSearchParams();
   const { data: cal } = useApi('/calendar');
 
-  const years = useMemo(() => [...new Set((cal?.months || []).map((m) => m.year))], [cal]);
-  const selected = params.get('m') || cal?.currentMonth;
-  const selectedYear = Number(selected?.slice(0, 4));
-  const selectedInfo = cal?.months.find((m) => m.key === selected);
-
-  const selectMonth = (key) => setParams({ m: key }, { replace: true });
-
-  const selectYear = (year) => {
-    // Jump to the latest unlocked month of that year (or its first month if all locked)
-    const ofYear = cal.months.filter((m) => m.year === year);
-    const unlocked = ofYear.filter((m) => !m.locked);
-    selectMonth((unlocked.at(-1) || ofYear[0]).key);
-  };
-
   if (!cal) {
     return (
       <Stack spacing={2}>
-        <Skeleton variant="rounded" height={90} />
+        <Skeleton variant="rounded" height={84} />
         <Skeleton variant="rounded" height={380} />
       </Stack>
     );
   }
 
+  const selected = params.get('m') || cal.currentMonth;
+  // Only months that are open can be browsed with the ‹ › arrows
+  const open = cal.months.filter((m) => !m.locked);
+  const idx = open.findIndex((m) => m.key === selected);
+  const month = idx === -1 ? cal.currentMonth : selected;
+  const i = idx === -1 ? open.findIndex((m) => m.key === cal.currentMonth) : idx;
+  const go = (key) => setParams(key === cal.currentMonth ? {} : { m: key }, { replace: true });
+  const prev = i > 0 ? () => go(open[i - 1].key) : undefined;
+  const next = i >= 0 && i < open.length - 1 ? () => go(open[i + 1].key) : undefined;
+
   return (
-    <Stack spacing={{ xs: 2, md: 3 }}>
-      <Box>
-        <Typography variant="h5">{t('dash.hello', { name: user?.name?.split(' ')[0] })}</Typography>
-        <Typography color="text.secondary">{t('dash.sub')}</Typography>
+    <Stack spacing={2}>
+      <Box sx={{ pt: { xs: 1, md: 0 } }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>{longDate(cal.today)}</Typography>
+        <Typography variant="h4" sx={{ mt: 0.25 }}>
+          {t(greetingKey())}, {user?.name?.split(' ')[0]} ✨
+        </Typography>
       </Box>
 
       <TodaySummary />
+      <TodayHabits month={cal.currentMonth} />
 
-      <Card>
-        <CardContent sx={{ pb: '16px !important' }}>
-          <Tabs value={years.includes(selectedYear) ? selectedYear : false} onChange={(_, y) => selectYear(y)} sx={{ mb: 1.5 }}>
-            {years.map((y) => <Tab key={y} value={y} label={y} />)}
-          </Tabs>
-          <Box
-            sx={{
-              display: 'flex',
-              gap: 1,
-              overflowX: 'auto',
-              pb: 0.5,
-              flexWrap: { xs: 'nowrap', md: 'wrap' },
-              scrollbarWidth: 'thin',
-            }}
-          >
-            {cal.months
-              .filter((m) => m.year === selectedYear)
-              .map((m) => {
-                const chip = (
-                  <Chip
-                    key={m.key}
-                    label={m.label.split(' ')[0]}
-                    icon={m.locked ? <LockIcon fontSize="small" /> : undefined}
-                    color={m.key === selected ? 'primary' : 'default'}
-                    variant={m.key === selected ? 'filled' : 'outlined'}
-                    onClick={m.locked ? undefined : () => selectMonth(m.key)}
-                    disabled={m.locked}
-                    sx={{ flexShrink: 0, fontWeight: m.current ? 700 : 500 }}
-                  />
-                );
-                return m.locked ? (
-                  <Tooltip key={m.key} title={t('month.lockedTip')}>
-                    <span>{chip}</span>
-                  </Tooltip>
-                ) : chip;
-              })}
-          </Box>
-        </CardContent>
-      </Card>
-
-      {selectedInfo && !selectedInfo.locked ? (
-        <Box sx={{ display: 'grid', gap: { xs: 2, md: 3 }, gridTemplateColumns: { xs: '1fr', lg: '420px 1fr' }, alignItems: 'start' }}>
-          <MonthCalendar month={selected} today={cal.today} />
-          <MonthLine month={selected} today={cal.today} />
-        </Box>
-      ) : (
-        <Card>
-          <CardContent sx={{ textAlign: 'center', py: 6 }}>
-            <LockIcon color="disabled" sx={{ fontSize: 48 }} />
-            <Typography variant="h6">{t('month.locked')}</Typography>
-            <Typography color="text.secondary">{t('month.lockedSub')}</Typography>
-          </CardContent>
-        </Card>
-      )}
+      <Box sx={{ display: 'grid', gap: { xs: 2, md: 3 }, gridTemplateColumns: { xs: '1fr', lg: '420px 1fr' }, alignItems: 'start' }}>
+        <MonthCalendar month={month} today={cal.today} onPrev={prev} onNext={next} />
+        {/* daily progress chart: below the calendar on phones, beside it on wide screens */}
+        <MonthLine month={month} today={cal.today} />
+      </Box>
     </Stack>
   );
 }

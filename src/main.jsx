@@ -10,6 +10,7 @@ import { ToastProvider } from './Toast';
 import App from './App';
 import { registerServiceWorker } from './push';
 import { startAutoUpdate } from './autoUpdate';
+import './install'; // catch the install prompt as early as possible
 
 registerServiceWorker();
 startAutoUpdate();

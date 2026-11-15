@@ -5,6 +5,9 @@ import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import ButtonBase from '@mui/material/ButtonBase';
+import IconButton from '@mui/material/IconButton';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { alpha } from '@mui/material/styles';
 import { useApi } from '../cache';
 import { WEEKDAYS, daysInMonth, firstWeekday, monthLabel, pad } from '../utils';
@@ -18,7 +21,7 @@ function dayColor(theme, info) {
   return alpha(theme.palette.error.main, 0.18);
 }
 
-export default function MonthCalendar({ month, today }) {
+export default function MonthCalendar({ month, today, onPrev, onNext }) {
   const navigate = useNavigate();
   const t = useT();
   const { data } = useApi('/tasks/month', { month });
@@ -33,7 +36,12 @@ export default function MonthCalendar({ month, today }) {
   return (
     <Card>
       <CardContent>
-        <Typography variant="h6" sx={{ mb: 2 }}>{monthLabel(month)}</Typography>
+        {/* Month switcher lives in the header: ‹ November 2026 › */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+          <IconButton size="small" onClick={onPrev} disabled={!onPrev} aria-label="previous month"><ChevronLeftIcon /></IconButton>
+          <Typography variant="h6" sx={{ flexGrow: 1, textAlign: 'center' }}>{monthLabel(month)}</Typography>
+          <IconButton size="small" onClick={onNext} disabled={!onNext} aria-label="next month"><ChevronRightIcon /></IconButton>
+        </Box>
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: { xs: 0.5, sm: 0.75 } }}>
           {WEEKDAYS.map((w) => (
             <Typography key={w} variant="caption" color="text.secondary" sx={{ textAlign: 'center', fontWeight: 600 }}>
