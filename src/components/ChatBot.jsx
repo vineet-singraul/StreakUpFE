@@ -9,16 +9,18 @@ import InputBase from '@mui/material/InputBase';
 import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Tooltip from '@mui/material/Tooltip';
-import CircularProgress from '@mui/material/CircularProgress';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { keyframes, useTheme } from '@mui/material/styles';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CloseIcon from '@mui/icons-material/Close';
-import SendIcon from '@mui/icons-material/Send';
+import NearMeIcon from '@mui/icons-material/NearMe';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import StorageIcon from '@mui/icons-material/Storage';
 import api, { errMsg } from '../api';
 import { useT } from '../i18n';
+import { BRAND_GRADIENT } from '../theme';
+import { useAuth } from '../AuthContext';
+import ButtonBase from '@mui/material/ButtonBase';
 
 const STORE_KEY = 'ht_chat';
 
@@ -51,6 +53,10 @@ const bubbleIn = keyframes`
   100% { opacity: 1; transform: translate(0, -50%) scale(1); }
 `;
 // Users who prefer less motion get a calm, static button
+const dot = keyframes`
+  0%, 80%, 100% { transform: translateY(0); opacity: .4; }
+  40% { transform: translateY(-5px); opacity: 1; }
+`;
 const reduceMotion = { '@media (prefers-reduced-motion: reduce)': { animation: 'none' } };
 
 function load() {
@@ -97,19 +103,46 @@ function QueryView({ query }) {
   );
 }
 
+/** Small gradient robot shown next to bot messages */
+function BotAvatar() {
+  return (
+    <Box sx={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', color: '#fff', background: BRAND_GRADIENT, boxShadow: '0 3px 10px rgba(124,58,237,.35)' }}>
+      <SmartToyIcon sx={{ fontSize: 17 }} />
+    </Box>
+  );
+}
+
+/** "Typing…" bubble: three bouncing dots */
+function TypingBubble() {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mb: 1.5 }}>
+      <BotAvatar />
+      <Box sx={{ display: 'flex', gap: 0.6, px: 2, py: 1.5, borderRadius: '20px', borderBottomLeftRadius: 6, bgcolor: 'rgba(127,127,160,.10)', border: '1px solid', borderColor: 'divider' }}>
+        {[0, 0.15, 0.3].map((d) => (
+          <Box key={d} sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: 'primary.main', animation: `${dot} 1.2s ease-in-out ${d}s infinite`, ...reduceMotion }} />
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
 function Bubble({ msg }) {
   const mine = msg.role === 'user';
   return (
-    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', mb: 1.25 }}>
+    <Box sx={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: 1, mb: 1.5 }}>
+      {!mine && <BotAvatar />}
       <Paper
         elevation={0}
         sx={{
-          px: 1.5, py: 1, maxWidth: '85%', borderRadius: 2.5,
-          borderBottomRightRadius: mine ? 4 : undefined,
-          borderBottomLeftRadius: mine ? undefined : 4,
-          bgcolor: mine ? 'primary.main' : msg.error ? 'error.light' : 'background.paper',
-          color: mine ? 'primary.contrastText' : 'text.primary',
-          border: mine ? 0 : 1, borderColor: 'divider',
+          px: 1.75, py: 1.1, maxWidth: '85%', borderRadius: '20px',
+          borderBottomRightRadius: mine ? 6 : undefined,
+          borderBottomLeftRadius: mine ? undefined : 6,
+          // mine: lavender gradient with glow · bot: soft glass bubble
+          background: mine ? 'linear-gradient(135deg, #9a9dfa, #7c80f5)' : undefined,
+          bgcolor: mine ? undefined : msg.error ? 'rgba(239,68,68,.15)' : 'rgba(127,127,160,.10)',
+          boxShadow: mine ? '0 6px 18px rgba(139,143,248,.35)' : 'none',
+          color: mine ? '#fff' : 'text.primary',
+          border: mine ? 0 : '1px solid', borderColor: 'divider',
         }}
       >
         <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.text}</Typography>
@@ -122,6 +155,7 @@ function Bubble({ msg }) {
 export default function ChatBot() {
   const t = useT();
   const theme = useTheme();
+  const { user } = useAuth();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState(load);
@@ -177,7 +211,13 @@ export default function ChatBot() {
     }
   };
 
-  const suggestions = [t('chat.s1'), t('chat.s2'), t('chat.s3'), t('chat.s4')];
+  const suggestions = [
+    ['📋', '59,130,246', t('chat.s1')],
+    ['✅', '34,197,94', t('chat.s2')],
+    ['🔥', '249,115,22', t('chat.s3')],
+    ['📈', '168,85,247', t('chat.s4')],
+  ];
+  const firstName = user?.name?.split(' ')[0] || '';
 
   return (
     <>
@@ -268,14 +308,31 @@ export default function ChatBot() {
         fullScreen={mobile}
         fullWidth
         maxWidth="sm"
-        slotProps={{ paper: { sx: { height: mobile ? '100%' : '75vh', display: 'flex', flexDirection: 'column' } } }}
+        slotProps={{
+          paper: {
+            sx: {
+              height: mobile ? '100%' : '75vh', display: 'flex', flexDirection: 'column',
+              borderRadius: mobile ? 0 : '24px', backgroundImage: 'none',
+              // same navy + teal/violet glow look as the app
+              // CSS variable (not a fixed hex) so the background follows light/dark exactly like the text does
+              background: `radial-gradient(80% 50% at 100% 0%, rgba(20,184,166,.14), transparent 60%),
+                radial-gradient(80% 60% at 0% 100%, rgba(124,58,237,.18), transparent 60%), var(--mui-palette-background-default)`,
+              border: mobile ? 0 : '1px solid', borderColor: 'divider',
+            },
+          },
+        }}
       >
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 1.25, borderBottom: 1, borderColor: 'divider' }}>
-          <SmartToyIcon color="primary" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ position: 'relative', flexShrink: 0 }}>
+            <Box sx={{ width: 42, height: 42, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', background: BRAND_GRADIENT, boxShadow: '0 4px 14px rgba(124,58,237,.4)' }}>
+              <SmartToyIcon sx={{ fontSize: 23 }} />
+            </Box>
+            <Box sx={{ position: 'absolute', right: 0, bottom: 0, width: 12, height: 12, borderRadius: '50%', bgcolor: '#22c55e', border: '2px solid', borderColor: 'background.default' }} />
+          </Box>
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>{t('chat.title')}</Typography>
-            <Typography variant="caption" color="text.secondary">{t('chat.sub')}</Typography>
+            <Typography sx={{ fontWeight: 800, lineHeight: 1.2 }}>{t('chat.title')}</Typography>
+            <Typography variant="caption" sx={{ color: '#22c55e', fontWeight: 600 }}>● {t('chat.online')}</Typography>
           </Box>
           {msgs.length > 0 && (
             <Tooltip title={t('chat.clear')}>
@@ -286,26 +343,64 @@ export default function ChatBot() {
         </Box>
 
         {/* Messages */}
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, bgcolor: 'background.default' }}>
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column' }}>
           {msgs.length === 0 && (
-            <Box sx={{ textAlign: 'center', mt: 3 }}>
-              <SmartToyIcon sx={{ fontSize: 48, color: 'primary.main', opacity: 0.8 }} />
-              <Typography sx={{ mt: 1, mb: 2 }} color="text.secondary">{t('chat.empty')}</Typography>
-              <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 2 }}>{t('chat.notice')}</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                {suggestions.map((s) => (
-                  <Chip key={s} label={s} onClick={() => send(s)} variant="outlined" color="primary" />
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', py: 2 }}>
+              {/* avatar with soft pulsing halo */}
+              <Box sx={{ position: 'relative', width: 88, height: 88, mb: 2.5 }}>
+                {[0, 1.3].map((d) => (
+                  <Box key={d} aria-hidden sx={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(139,143,248,.55)', animation: `${ring} 2.6s ease-out ${d}s infinite`, ...reduceMotion }} />
+                ))}
+                <Box sx={{ position: 'relative', width: 88, height: 88, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', background: BRAND_GRADIENT, boxShadow: '0 12px 36px rgba(124,58,237,.5)' }}>
+                  <SmartToyIcon sx={{ fontSize: 46 }} />
+                </Box>
+              </Box>
+
+              <Typography
+                sx={{
+                  fontWeight: 800, fontSize: 26, lineHeight: 1.2,
+                  background: 'linear-gradient(90deg, #c4b5fd, #8b8ff8 45%, #67e8f9)',
+                  WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
+                }}
+              >
+                {firstName ? t('chat.hi', { name: firstName }) : t('chat.hiThere')}
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 0.75, mb: 3, px: 1, width: '100%', maxWidth: 320, fontSize: 14.5, lineHeight: 1.55, overflowWrap: 'anywhere' }}>{t('chat.empty')}</Typography>
+
+              {/* suggestion cards: one swipeable row, no scrollbar */}
+              <Box
+                sx={{
+                  alignSelf: 'stretch', display: 'flex', gap: 1, overflowX: 'auto',
+                  mx: -2, px: 2, pb: 1, pt: 0.5,
+                  scrollSnapType: 'x proximity',
+                  scrollPaddingInline: '16px', // snapping keeps the 16px side gap
+                  scrollbarWidth: 'none', msOverflowStyle: 'none',
+                  '&::-webkit-scrollbar': { display: 'none' },
+                  '& > *': { flexShrink: 0, scrollSnapAlign: 'start' },
+                }}
+              >
+                {suggestions.map(([emoji, rgb, text]) => (
+                  <ButtonBase
+                    key={text}
+                    onClick={() => send(text)}
+                    sx={{
+                      py: 0.75, pl: 0.75, pr: 1.5, borderRadius: 99, textAlign: 'left', whiteSpace: 'nowrap',
+                      flexDirection: 'row', alignItems: 'center', gap: 1,
+                      bgcolor: 'rgba(127,127,160,.08)', border: '1px solid', borderColor: 'divider',
+                      transition: 'transform .2s ease, border-color .2s ease, background-color .2s ease',
+                      '&:hover': { transform: 'translateY(-3px)', borderColor: 'primary.main', bgcolor: 'rgba(139,143,248,.12)' },
+                    }}
+                  >
+                    <Box sx={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', fontSize: 14, bgcolor: `rgba(${rgb},.18)` }}>{emoji}</Box>
+                    <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{text}</Typography>
+                  </ButtonBase>
                 ))}
               </Box>
+
             </Box>
           )}
           {msgs.map((m, i) => <Bubble key={i} msg={m} />)}
-          {busy && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
-              <CircularProgress size={16} />
-              <Typography variant="body2">{t('chat.thinking')}</Typography>
-            </Box>
-          )}
+          {busy && <TypingBubble />}
           <div ref={endRef} />
         </Box>
 
@@ -313,18 +408,40 @@ export default function ChatBot() {
         <Box
           component="form"
           onSubmit={(e) => { e.preventDefault(); send(); }}
-          sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.25, borderTop: 1, borderColor: 'divider' }}
+          sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1.5, pt: 1.25, pb: 'calc(12px + env(safe-area-inset-bottom))' }}
         >
+          {/* pill input with a soft border that lights up on focus */}
           <InputBase
             autoFocus
             fullWidth
             value={input}
             onChange={(e) => setInput(e.target.value.slice(0, 500))}
             placeholder={t('chat.placeholder')}
-            sx={{ px: 1.5, py: 0.75, borderRadius: 5, bgcolor: 'action.hover' }}
+            sx={{
+              height: 50, px: 2.5, borderRadius: 99,
+              bgcolor: 'rgba(127,127,160,.10)',
+              border: '1px solid', borderColor: 'divider',
+              transition: 'border-color .2s, box-shadow .2s',
+              '&.Mui-focused': { borderColor: 'primary.main', boxShadow: '0 0 0 3px rgba(139,143,248,.15)' },
+              '& input::placeholder': { color: 'text.secondary', opacity: 0.9 },
+            }}
           />
-          <IconButton type="submit" color="primary" disabled={!input.trim() || busy} aria-label="send">
-            <SendIcon />
+          {/* round lavender send button with a glow */}
+          <IconButton
+            type="submit"
+            disabled={!input.trim() || busy}
+            aria-label="send"
+            sx={{
+              width: 50, height: 50, flexShrink: 0, color: '#fff',
+              bgcolor: '#8b8ff8',
+              boxShadow: '0 6px 20px rgba(139,143,248,.55)',
+              transition: 'transform .15s, box-shadow .2s, opacity .2s',
+              '&:hover': { bgcolor: '#7c80f5', transform: 'scale(1.05)' },
+              '&:active': { transform: 'scale(.94)' },
+              '&.Mui-disabled': { bgcolor: '#8b8ff8', color: '#fff', opacity: 0.55, boxShadow: 'none' },
+            }}
+          >
+            <NearMeIcon sx={{ fontSize: 22 }} />
           </IconButton>
         </Box>
       </Dialog>
