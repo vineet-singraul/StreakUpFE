@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
@@ -15,6 +14,11 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
+import Dialog from '@mui/material/Dialog';
+import Divider from '@mui/material/Divider';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import AlarmAddIcon from '@mui/icons-material/AlarmAdd';
 import AlarmIcon from '@mui/icons-material/Alarm';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -34,16 +38,18 @@ import { useToast } from '../Toast';
 import { useT } from '../i18n';
 import { enablePush, pushSupported } from '../push';
 import { BRAND_GRADIENT } from '../theme';
-import { fmtWhen, remindersChanged, testReminder, REMINDERS_CHANGED } from '../reminders';
+import { fmtWhen, fmtTime, dayLabel, remindersChanged, testReminder, REMINDERS_CHANGED } from '../reminders';
 import { playTone, playBlob, speak, stopSpeaking, ttsSupported, saveAudio, deleteAudio } from '../reminderAudio';
 
-const TONE_META = {
-  chime: { icon: <NotificationsActiveIcon /> },
-  bell: { icon: <NotificationsIcon /> },
-  digital: { icon: <GraphicEqIcon /> },
-  soft: { icon: <SpaIcon /> },
-  song: { icon: <MusicNoteIcon /> },
-  voice: { icon: <MicIcon /> },
+const TONES = ['chime', 'bell', 'digital', 'soft', 'song', 'voice'];
+const BUILTIN = ['chime', 'bell', 'digital', 'soft'];
+const TONE_ICON = {
+  chime: <NotificationsActiveIcon />,
+  bell: <NotificationsIcon />,
+  digital: <GraphicEqIcon />,
+  soft: <SpaIcon />,
+  song: <MusicNoteIcon />,
+  voice: <MicIcon />,
 };
 const MAX_SONG_MB = 15;
 const MAX_REC_SEC = 60;
@@ -59,8 +65,7 @@ function toParts(d) {
 /** form fields -> Date */
 function fromParts({ date, hour, minute, ampm }) {
   const [y, m, d] = date.split('-').map(Number);
-  const h24 = (Number(hour) % 12) + (ampm === 'PM' ? 12 : 0);
-  return new Date(y, m - 1, d, h24, Number(minute), 0, 0);
+  return new Date(y, m - 1, d, (Number(hour) % 12) + (ampm === 'PM' ? 12 : 0), Number(minute), 0, 0);
 }
 const inMinutes = (n) => {
   const d = new Date(Date.now() + n * 60_000);
@@ -81,8 +86,8 @@ function IconBubble({ children, active, size = 40 }) {
         width: size, height: size, borderRadius: '50%', flexShrink: 0,
         display: 'grid', placeItems: 'center',
         color: active ? '#fff' : 'primary.main',
-        background: active ? BRAND_GRADIENT : 'transparent',
-        bgcolor: active ? undefined : 'action.hover',
+        bgcolor: 'action.hover',
+        ...(active ? { background: BRAND_GRADIENT } : {}),
         '& svg': { fontSize: size * 0.5 },
       }}
     >
@@ -91,10 +96,182 @@ function IconBubble({ children, active, size = 40 }) {
   );
 }
 
+/* =====================================================================
+   Page: list of reminders + "New" button
+   ===================================================================== */
+
 export default function Reminders() {
   const { user, setUser } = useAuth();
   const t = useT();
   const toast = useToast();
+  const [list, setList] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [busyPush, setBusyPush] = useState(false);
+  const [, tick] = useState(0);
+
+  const load = () => api.get('/reminders').then(({ data }) => setList(data.reminders)).catch((err) => toast(errMsg(err), 'error'));
+
+  useEffect(() => {
+    load();
+    window.addEventListener(REMINDERS_CHANGED, load);
+    const id = setInterval(() => tick((n) => n + 1), 30_000); // move rung ones to "Done"
+    return () => {
+      window.removeEventListener(REMINDERS_CHANGED, load);
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const remove = async (r) => {
+    setList((l) => l.filter((x) => x._id !== r._id));
+    try {
+      await api.delete(`/reminders/${r._id}`);
+      deleteAudio(r._id);
+      remindersChanged();
+    } catch (err) {
+      toast(errMsg(err), 'error');
+      load();
+    }
+  };
+
+  const turnOnPush = async () => {
+    setBusyPush(true);
+    try {
+      setUser(await enablePush());
+      toast(t('notify.on'));
+    } catch (err) {
+      toast(errMsg(err), 'error');
+    } finally {
+      setBusyPush(false);
+    }
+  };
+
+  const pushReady = user?.pushEnabled && pushSupported() && Notification.permission === 'granted';
+  const now = Date.now();
+  const upcoming = (list || []).filter((r) => new Date(r.at).getTime() > now);
+  const past = (list || []).filter((r) => new Date(r.at).getTime() <= now).reverse();
+
+  return (
+    <Stack spacing={2} sx={{ maxWidth: 680 }}>
+      {/* header */}
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="h5">{t('nav.reminders')}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {list ? t('rem.count', { n: upcoming.length }) : ' '}
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setFormOpen(true)}
+          sx={{ background: BRAND_GRADIENT, px: 2.25, py: 1, borderRadius: 99, boxShadow: '0 6px 18px rgba(99,102,241,.35)' }}
+        >
+          {t('rem.new')}
+        </Button>
+      </Stack>
+
+      {!pushReady && (
+        <Alert
+          severity="info"
+          sx={{ borderRadius: 3 }}
+          action={pushSupported() && Notification.permission !== 'denied'
+            ? <Button color="inherit" size="small" onClick={turnOnPush} disabled={busyPush}>{t('rem.enable')}</Button>
+            : undefined}
+        >
+          {t('rem.pushOff')}
+        </Alert>
+      )}
+
+      {/* upcoming */}
+      {!list ? (
+        <Stack spacing={1}>
+          <Skeleton variant="rounded" height={76} sx={{ borderRadius: 4 }} />
+          <Skeleton variant="rounded" height={76} sx={{ borderRadius: 4 }} />
+        </Stack>
+      ) : !upcoming.length ? (
+        <Card sx={{ textAlign: 'center', py: 5, px: 3 }}>
+          <Box sx={{ width: 72, height: 72, mx: 'auto', mb: 2, borderRadius: '50%', display: 'grid', placeItems: 'center', background: BRAND_GRADIENT, color: '#fff' }}>
+            <AlarmIcon sx={{ fontSize: 38 }} />
+          </Box>
+          <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{t('rem.empty')}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>{t('rem.sub')}</Typography>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setFormOpen(true)}>{t('rem.new')}</Button>
+        </Card>
+      ) : (
+        <Stack spacing={1.25}>
+          {upcoming.map((r) => <ReminderRow key={r._id} r={r} t={t} onDelete={remove} />)}
+        </Stack>
+      )}
+
+      {/* done */}
+      {past.length > 0 && (
+        <>
+          <Typography variant="overline" color="text.secondary" sx={{ pt: 1, fontWeight: 700 }}>{t('rem.past')}</Typography>
+          <Stack spacing={1}>
+            {past.map((r) => <ReminderRow key={r._id} r={r} t={t} onDelete={remove} done />)}
+          </Stack>
+        </>
+      )}
+
+      <NewReminderDialog open={formOpen} onClose={() => setFormOpen(false)} />
+    </Stack>
+  );
+}
+
+/** One reminder: big time on the left, title + day, test & delete on the right */
+function ReminderRow({ r, t, onDelete, done }) {
+  return (
+    <Card sx={{ opacity: done ? 0.6 : 1 }}>
+      <Stack direction="row" sx={{ alignItems: 'stretch' }}>
+        <Box
+          sx={{
+            width: 92, flexShrink: 0, py: 1.5, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            borderRight: 1, borderColor: 'divider',
+          }}
+        >
+          <Typography sx={{ fontWeight: 800, fontSize: 17, lineHeight: 1.1 }}>{fmtTime(r.at).replace(/\s?[AP]M/, '')}</Typography>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'primary.main' }}>{fmtTime(r.at).match(/[AP]M/)?.[0]}</Typography>
+          <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.25 }}>{dayLabel(r.at, t)}</Typography>
+        </Box>
+        <Stack direction="row" spacing={1} sx={{ flex: 1, minWidth: 0, alignItems: 'center', pl: 1.75, pr: 0.75, py: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 700, textDecoration: done ? 'line-through' : 'none' }} noWrap>{r.title}</Typography>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', mt: 0.25, color: 'text.secondary' }}>
+              <Box sx={{ display: 'flex', '& svg': { fontSize: 15 } }}>{TONE_ICON[r.tone] || <AlarmIcon />}</Box>
+              <Typography variant="caption">{t(`rem.tone.${r.tone}`)}</Typography>
+              {r.speak && <RecordVoiceOverIcon sx={{ fontSize: 15 }} />}
+            </Stack>
+          </Box>
+          <Tooltip title={t('rem.test')}>
+            <IconButton size="small" onClick={() => testReminder(r)} sx={{ bgcolor: 'action.hover' }}><PlayArrowIcon fontSize="small" /></IconButton>
+          </Tooltip>
+          <IconButton size="small" onClick={() => onDelete(r)} aria-label="delete"><DeleteOutlineIcon fontSize="small" /></IconButton>
+        </Stack>
+      </Stack>
+    </Card>
+  );
+}
+
+function Section({ label, children }) {
+  return (
+    <Box>
+      <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 0.75, lineHeight: 1.5 }}>{label}</Typography>
+      {children}
+    </Box>
+  );
+}
+
+/* =====================================================================
+   "+ New" form: full screen on phones, a dialog on desktop
+   ===================================================================== */
+
+function NewReminderDialog({ open, onClose }) {
+  const { user } = useAuth();
+  const t = useT();
+  const toast = useToast();
+  const phone = useMediaQuery((theme) => theme.breakpoints.down('sm'));
 
   const [title, setTitle] = useState('');
   const [when, setWhen] = useState(() => toParts(inMinutes(10)));
@@ -104,30 +281,33 @@ export default function Reminders() {
   const [voice, setVoice] = useState(null); // Blob
   const [recording, setRecording] = useState(0); // seconds while recording, 0 = idle
   const [saving, setSaving] = useState(false);
-  const [list, setList] = useState(null);
-  const [busyPush, setBusyPush] = useState(false);
 
   const stopPreview = useRef(() => {});
   const recorder = useRef(null);
   const recTimer = useRef(null);
   const fileInput = useRef(null);
 
-  const load = () => api.get('/reminders').then(({ data }) => setList(data.reminders)).catch((err) => toast(errMsg(err), 'error'));
+  const stopAll = () => {
+    stopPreview.current();
+    stopPreview.current = () => {};
+    stopSpeaking();
+    if (recorder.current?.state === 'recording') recorder.current.stop();
+  };
 
+  // Fresh form every time it opens
   useEffect(() => {
-    load();
-    window.addEventListener(REMINDERS_CHANGED, load);
-    return () => {
-      window.removeEventListener(REMINDERS_CHANGED, load);
-      stopPreview.current();
-      stopSpeaking();
-      if (recorder.current?.state === 'recording') recorder.current.stop();
-      clearInterval(recTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!open) return;
+    setTitle('');
+    setWhen(toParts(inMinutes(10)));
+    setTone('chime');
+    setSpeakOn(true);
+    setSong(null);
+    setVoice(null);
+  }, [open]);
 
-  /* ---------- previews ---------- */
+  useEffect(() => () => { stopAll(); clearInterval(recTimer.current); }, []);
+
+  const close = () => { stopAll(); onClose(); };
 
   const preview = async (fn) => {
     stopPreview.current();
@@ -141,11 +321,9 @@ export default function Reminders() {
 
   const chooseTone = (name) => {
     setTone(name);
-    if (TONE_META[name] && ['chime', 'bell', 'digital', 'soft'].includes(name)) preview(() => playTone(name, { loop: false }));
+    if (BUILTIN.includes(name)) preview(() => playTone(name, { loop: false }));
     else stopPreview.current();
   };
-
-  /* ---------- song ---------- */
 
   const onSongPicked = (e) => {
     const file = e.target.files?.[0];
@@ -156,8 +334,6 @@ export default function Reminders() {
     setSong(file);
     preview(() => playBlob(file, { loop: false }));
   };
-
-  /* ---------- voice recording ---------- */
 
   const startRec = async () => {
     stopPreview.current();
@@ -188,8 +364,6 @@ export default function Reminders() {
   };
   const stopRec = () => recorder.current?.state === 'recording' && recorder.current.stop();
 
-  /* ---------- save / delete ---------- */
-
   const at = fromParts(when);
   const inPast = at.getTime() < Date.now();
 
@@ -204,11 +378,8 @@ export default function Reminders() {
       if (tone === 'song') await saveAudio(data.reminder._id, song);
       if (tone === 'voice') await saveAudio(data.reminder._id, voice);
       toast(t('rem.saved', { when: fmtWhen(data.reminder.at, t) }));
-      stopPreview.current();
-      setTitle('');
-      setWhen(toParts(inMinutes(10)));
-      setVoice(null);
       remindersChanged();
+      close();
     } catch (err) {
       toast(errMsg(err), 'error');
     } finally {
@@ -216,194 +387,164 @@ export default function Reminders() {
     }
   };
 
-  const remove = async (r) => {
-    setList((l) => l.filter((x) => x._id !== r._id));
-    try {
-      await api.delete(`/reminders/${r._id}`);
-      deleteAudio(r._id);
-      remindersChanged();
-    } catch (err) {
-      toast(errMsg(err), 'error');
-      load();
-    }
-  };
-
-  const turnOnPush = async () => {
-    setBusyPush(true);
-    try {
-      setUser(await enablePush());
-      toast(t('notify.on'));
-    } catch (err) {
-      toast(errMsg(err), 'error');
-    } finally {
-      setBusyPush(false);
-    }
-  };
-
-  const pushReady = user?.pushEnabled && pushSupported() && Notification.permission === 'granted';
-  const now = Date.now();
-  const upcoming = (list || []).filter((r) => new Date(r.at).getTime() > now);
-  const past = (list || []).filter((r) => new Date(r.at).getTime() <= now).reverse();
-  const tonesRow = ['chime', 'bell', 'digital', 'soft', 'song', 'voice'];
-
   return (
-    <Stack spacing={2} sx={{ maxWidth: 640 }}>
-      <Box>
-        <Typography variant="h5">{t('nav.reminders')}</Typography>
-        <Typography variant="body2" color="text.secondary">{t('rem.sub')}</Typography>
-      </Box>
+    <Dialog
+      open={open}
+      onClose={close}
+      fullScreen={phone}
+      fullWidth
+      maxWidth="sm"
+      slotProps={{ paper: { sx: { borderRadius: phone ? 0 : 5, bgcolor: 'background.default', backgroundImage: 'none' } } }}
+    >
+      {/* top bar */}
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1.5, py: 1.25, borderBottom: 1, borderColor: 'divider' }}>
+        <IconButton onClick={close} aria-label="close"><CloseIcon /></IconButton>
+        <Typography sx={{ fontWeight: 800, fontSize: 18, flex: 1 }}>{t('rem.newTitle')}</Typography>
+      </Stack>
 
-      {!pushReady && (
-        <Alert
-          severity="info"
-          action={pushSupported() && Notification.permission !== 'denied'
-            ? <Button color="inherit" size="small" onClick={turnOnPush} disabled={busyPush}>{t('rem.enable')}</Button>
-            : undefined}
-        >
-          {t('rem.pushOff')}
-        </Alert>
-      )}
+      <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, sm: 3 }, py: 2.5 }}>
+        <Stack spacing={3}>
+          <TextField
+            autoFocus
+            label={t('rem.titleLabel')}
+            placeholder={t('rem.titlePh')}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            slotProps={{ htmlInput: { maxLength: 200 } }}
+            fullWidth
+          />
 
-      {/* ---------- new reminder ---------- */}
-      <Card>
-        <CardContent>
-          <Stack spacing={2.25}>
-            <TextField
-              label={t('rem.titleLabel')}
-              placeholder={t('rem.titlePh')}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              slotProps={{ htmlInput: { maxLength: 200 } }}
-              fullWidth
-            />
-
-            {/* when */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('rem.when')}</Typography>
-              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mb: 1.5 }}>
-                {[['rem.in10', () => inMinutes(10)], ['rem.in30', () => inMinutes(30)], ['rem.in1h', () => inMinutes(60)], ['rem.tom9', tomorrowAt9]].map(([k, fn]) => (
-                  <Chip key={k} label={t(k)} variant="outlined" clickable onClick={() => setWhen(toParts(fn()))} />
-                ))}
-              </Stack>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          {/* when */}
+          <Section label={t('rem.when')}>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mb: 2 }}>
+              {[['rem.in10', () => inMinutes(10)], ['rem.in30', () => inMinutes(30)], ['rem.in1h', () => inMinutes(60)], ['rem.tom9', tomorrowAt9]].map(([k, fn]) => (
+                <Chip key={k} label={t(k)} variant="outlined" clickable onClick={() => setWhen(toParts(fn()))} />
+              ))}
+            </Stack>
+            <Stack spacing={1.5}>
+              <TextField
+                type="date"
+                label={t('rem.date')}
+                value={when.date}
+                onChange={(e) => e.target.value && setWhen((w) => ({ ...w, date: e.target.value }))}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: isoDate(new Date()) } }}
+                fullWidth
+              />
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <TextField
-                  type="date"
-                  label={t('rem.date')}
-                  value={when.date}
-                  onChange={(e) => e.target.value && setWhen((w) => ({ ...w, date: e.target.value }))}
-                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: isoDate(new Date()) } }}
+                  select
+                  label={t('rem.hour')}
+                  value={when.hour}
+                  onChange={(e) => setWhen((w) => ({ ...w, hour: Number(e.target.value) }))}
+                  slotProps={{ select: { native: true } }}
                   sx={{ flex: 1 }}
-                />
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <TextField
-                    select
-                    label={t('rem.hour')}
-                    value={when.hour}
-                    onChange={(e) => setWhen((w) => ({ ...w, hour: Number(e.target.value) }))}
-                    slotProps={{ select: { native: true } }}
-                    sx={{ width: 76 }}
-                  >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{h}</option>)}
-                  </TextField>
-                  <Typography sx={{ fontWeight: 700 }}>:</Typography>
-                  <TextField
-                    select
-                    label={t('rem.min')}
-                    value={when.minute}
-                    onChange={(e) => setWhen((w) => ({ ...w, minute: Number(e.target.value) }))}
-                    slotProps={{ select: { native: true } }}
-                    sx={{ width: 76 }}
-                  >
-                    {Array.from({ length: 60 }, (_, i) => i).map((m) => <option key={m} value={m}>{pad(m)}</option>)}
-                  </TextField>
-                  <ToggleButtonGroup
-                    exclusive
-                    size="small"
-                    color="primary"
-                    value={when.ampm}
-                    onChange={(_, v) => v && setWhen((w) => ({ ...w, ampm: v }))}
-                    sx={{ height: 56 }}
-                  >
-                    <ToggleButton value="AM" sx={{ px: 1.5, fontWeight: 700 }}>AM</ToggleButton>
-                    <ToggleButton value="PM" sx={{ px: 1.5, fontWeight: 700 }}>PM</ToggleButton>
-                  </ToggleButtonGroup>
-                </Stack>
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{h}</option>)}
+                </TextField>
+                <Typography sx={{ fontWeight: 800, fontSize: 20 }}>:</Typography>
+                <TextField
+                  select
+                  label={t('rem.min')}
+                  value={when.minute}
+                  onChange={(e) => setWhen((w) => ({ ...w, minute: Number(e.target.value) }))}
+                  slotProps={{ select: { native: true } }}
+                  sx={{ flex: 1 }}
+                >
+                  {Array.from({ length: 60 }, (_, i) => i).map((m) => <option key={m} value={m}>{pad(m)}</option>)}
+                </TextField>
+                <ToggleButtonGroup
+                  exclusive
+                  color="primary"
+                  value={when.ampm}
+                  onChange={(_, v) => v && setWhen((w) => ({ ...w, ampm: v }))}
+                  sx={{ height: 56 }}
+                >
+                  <ToggleButton value="AM" sx={{ px: 1.75, fontWeight: 800 }}>AM</ToggleButton>
+                  <ToggleButton value="PM" sx={{ px: 1.75, fontWeight: 800 }}>PM</ToggleButton>
+                </ToggleButtonGroup>
               </Stack>
-              <Typography variant="caption" color={inPast ? 'error' : 'text.secondary'} sx={{ display: 'block', mt: 0.75 }}>
-                {inPast ? t('rem.pastTime') : `⏰ ${fmtWhen(at, t)}`}
-              </Typography>
+            </Stack>
+            <Box
+              sx={{
+                mt: 1.5, px: 1.5, py: 1, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1,
+                bgcolor: inPast ? 'error.main' : 'action.hover', color: inPast ? '#fff' : 'text.primary',
+              }}
+            >
+              <AlarmIcon fontSize="small" />
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{inPast ? t('rem.pastTime') : fmtWhen(at, t)}</Typography>
+            </Box>
+          </Section>
+
+          {/* sound */}
+          <Section label={t('rem.sound')}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
+              {TONES.map((name) => {
+                const on = tone === name;
+                return (
+                  <ButtonBase
+                    key={name}
+                    onClick={() => chooseTone(name)}
+                    sx={{
+                      flexDirection: 'column', gap: 0.75, py: 1.5, borderRadius: 3,
+                      border: 1.5, borderColor: on ? 'primary.main' : 'divider',
+                      bgcolor: on ? 'action.selected' : 'background.paper',
+                    }}
+                  >
+                    <IconBubble active={on} size={38}>{TONE_ICON[name]}</IconBubble>
+                    <Typography sx={{ fontSize: 12.5, fontWeight: on ? 800 : 500 }}>{t(`rem.tone.${name}`)}</Typography>
+                  </ButtonBase>
+                );
+              })}
             </Box>
 
-            {/* sound */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('rem.sound')}</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, 1fr)', sm: 'repeat(6, 1fr)' }, gap: 1 }}>
-                {tonesRow.map((name) => {
-                  const on = tone === name;
-                  return (
-                    <ButtonBase
-                      key={name}
-                      onClick={() => chooseTone(name)}
-                      sx={{
-                        flexDirection: 'column', gap: 0.75, py: 1.25, borderRadius: 3,
-                        border: 1.5, borderColor: on ? 'primary.main' : 'divider',
-                        bgcolor: on ? 'action.selected' : 'transparent',
-                      }}
-                    >
-                      <IconBubble active={on} size={36}>{TONE_META[name].icon}</IconBubble>
-                      <Typography sx={{ fontSize: 12, fontWeight: on ? 700 : 500 }}>{t(`rem.tone.${name}`)}</Typography>
-                    </ButtonBase>
-                  );
-                })}
-              </Box>
+            {tone === 'song' && (
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
+                <input ref={fileInput} type="file" accept="audio/*" hidden onChange={onSongPicked} />
+                <Button variant="outlined" startIcon={<MusicNoteIcon />} onClick={() => fileInput.current?.click()}>
+                  {song ? t('rem.changeSong') : t('rem.pickSong')}
+                </Button>
+                {song && (
+                  <>
+                    <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{song.name}</Typography>
+                    <IconButton onClick={() => preview(() => playBlob(song, { loop: false }))}><PlayArrowIcon /></IconButton>
+                    <IconButton onClick={() => stopPreview.current()}><StopIcon /></IconButton>
+                  </>
+                )}
+              </Stack>
+            )}
 
-              {tone === 'song' && (
-                <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
-                  <input ref={fileInput} type="file" accept="audio/*" hidden onChange={onSongPicked} />
-                  <Button variant="outlined" startIcon={<MusicNoteIcon />} onClick={() => fileInput.current?.click()}>
-                    {song ? t('rem.changeSong') : t('rem.pickSong')}
+            {tone === 'voice' && (
+              <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
+                {recording ? (
+                  <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={stopRec}>
+                    {t('rem.stopRec')} · {recording}s
                   </Button>
-                  {song && (
-                    <>
-                      <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{song.name}</Typography>
-                      <IconButton onClick={() => preview(() => playBlob(song, { loop: false }))}><PlayArrowIcon /></IconButton>
-                      <IconButton onClick={() => stopPreview.current()}><StopIcon /></IconButton>
-                    </>
-                  )}
-                </Stack>
-              )}
+                ) : (
+                  <Button variant="outlined" startIcon={<MicIcon />} onClick={startRec}>
+                    {voice ? t('rem.reRecord') : t('rem.record')}
+                  </Button>
+                )}
+                {voice && !recording && (
+                  <>
+                    <Chip size="small" color="success" icon={<CheckCircleIcon />} label={t('rem.recorded')} />
+                    <IconButton onClick={() => preview(() => playBlob(voice, { loop: false }))}><PlayArrowIcon /></IconButton>
+                    <IconButton onClick={() => stopPreview.current()}><StopIcon /></IconButton>
+                  </>
+                )}
+              </Stack>
+            )}
+            {['song', 'voice'].includes(tone) && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>{t('rem.deviceOnly')}</Typography>
+            )}
+          </Section>
 
-              {tone === 'voice' && (
-                <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
-                  {recording ? (
-                    <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={stopRec}>
-                      {t('rem.stopRec')} · {recording}s
-                    </Button>
-                  ) : (
-                    <Button variant="outlined" startIcon={<MicIcon />} onClick={startRec}>
-                      {voice ? t('rem.reRecord') : t('rem.record')}
-                    </Button>
-                  )}
-                  {voice && !recording && (
-                    <>
-                      <Chip size="small" color="success" icon={<CheckCircleIcon />} label={t('rem.recorded')} />
-                      <IconButton onClick={() => preview(() => playBlob(voice, { loop: false }))}><PlayArrowIcon /></IconButton>
-                      <IconButton onClick={() => stopPreview.current()}><StopIcon /></IconButton>
-                    </>
-                  )}
-                </Stack>
-              )}
-              {['song', 'voice'].includes(tone) && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>{t('rem.deviceOnly')}</Typography>
-              )}
-            </Box>
-
-            {/* read aloud */}
-            {ttsSupported() && (
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-                <RecordVoiceOverIcon color="primary" />
+          {/* read aloud */}
+          {ttsSupported() && (
+            <Card>
+              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', p: 1.5 }}>
+                <IconBubble size={38}><RecordVoiceOverIcon /></IconBubble>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 600 }}>{t('rem.speak')}</Typography>
+                  <Typography sx={{ fontWeight: 700 }}>{t('rem.speak')}</Typography>
                   <Typography variant="caption" color="text.secondary">{t('rem.speakNote')}</Typography>
                 </Box>
                 <Tooltip title={t('rem.listen')}>
@@ -415,58 +556,26 @@ export default function Reminders() {
                 </Tooltip>
                 <Switch checked={speakOn} onChange={(e) => setSpeakOn(e.target.checked)} />
               </Stack>
-            )}
-
-            <Button variant="contained" size="large" startIcon={<AlarmAddIcon />} onClick={save} disabled={saving || Boolean(recording)}>
-              {t('rem.save')}
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
-
-      {/* ---------- list ---------- */}
-      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-        {t('rem.upcoming')} {list && `(${upcoming.length})`}
-      </Typography>
-      {!list ? (
-        <Skeleton variant="rounded" height={72} />
-      ) : !upcoming.length ? (
-        <Typography color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>{t('rem.empty')}</Typography>
-      ) : (
-        <Stack spacing={1}>
-          {upcoming.map((r) => <ReminderRow key={r._id} r={r} t={t} onDelete={remove} />)}
+            </Card>
+          )}
         </Stack>
-      )}
+      </Box>
 
-      {past.length > 0 && (
-        <>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, pt: 1 }}>{t('rem.past')}</Typography>
-          <Stack spacing={1} sx={{ opacity: 0.65 }}>
-            {past.map((r) => <ReminderRow key={r._id} r={r} t={t} onDelete={remove} />)}
-          </Stack>
-        </>
-      )}
-    </Stack>
-  );
-}
-
-function ReminderRow({ r, t, onDelete }) {
-  return (
-    <Card>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', p: 1.5 }}>
-        <IconBubble>{TONE_META[r.tone]?.icon || <AlarmIcon />}</IconBubble>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 600 }} noWrap>{r.title}</Typography>
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary">{fmtWhen(r.at, t)}</Typography>
-            {r.speak && <RecordVoiceOverIcon sx={{ fontSize: 14, color: 'text.secondary' }} />}
-          </Stack>
-        </Box>
-        <Tooltip title={t('rem.test')}>
-          <IconButton onClick={() => testReminder(r)}><PlayArrowIcon /></IconButton>
-        </Tooltip>
-        <IconButton onClick={() => onDelete(r)} aria-label="delete"><DeleteOutlineIcon /></IconButton>
-      </Stack>
-    </Card>
+      {/* save bar stays at the bottom */}
+      <Divider />
+      <Box sx={{ p: 2, pb: phone ? 'calc(16px + env(safe-area-inset-bottom))' : 2 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          size="large"
+          startIcon={<AlarmAddIcon />}
+          onClick={save}
+          disabled={saving || Boolean(recording)}
+          sx={{ py: 1.4, borderRadius: 99, background: BRAND_GRADIENT, fontSize: 16 }}
+        >
+          {t('rem.save')}
+        </Button>
+      </Box>
+    </Dialog>
   );
 }
