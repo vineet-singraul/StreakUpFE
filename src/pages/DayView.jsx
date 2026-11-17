@@ -21,6 +21,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LockClockIcon from '@mui/icons-material/LockClock';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import TimerOutlinedIcon from '@mui/icons-material/TimerOutlined';
 import PauseIcon from '@mui/icons-material/Pause';
 import api, { errMsg } from '../api';
 import { useApi } from '../cache';
@@ -57,6 +58,7 @@ export default function DayView() {
   const [estimate, setEstimate] = useState(''); // target minutes for a new task
   const [generating, setGenerating] = useState(false);
   const [reasonsOpen, setReasonsOpen] = useState(false);
+  const [expanded, setExpanded] = useState({}); // task ids whose long title is shown in full
 
   // Focus timer: at most one task runs at a time. `active` = { id, startedAt }
   const [active, setActive] = useState(null);
@@ -285,36 +287,26 @@ export default function DayView() {
                     const remaining = task.estimateMinutes * 60 - elapsed;
                     const over = remaining < 0;
                     timeChip = (
-                      <Chip
-                        size="small"
-                        color={over ? 'error' : running ? 'primary' : 'default'}
-                        variant={running ? 'filled' : 'outlined'}
-                        label={over ? t('day.over', { time: fmtTime(-remaining) }) : t('day.left', { time: fmtTime(remaining) })}
-                        sx={{ fontVariantNumeric: 'tabular-nums' }}
-                      />
+                      <TimeTag tone={over ? 'error' : running ? 'primary' : 'neutral'} live={running}>
+                        {over ? t('day.over', { time: fmtTime(-remaining) }) : t('day.left', { time: fmtTime(remaining) })}
+                      </TimeTag>
                     );
                   } else {
                     timeChip = (
-                      <Chip
-                        size="small"
-                        color={running ? 'primary' : 'default'}
-                        variant={running ? 'filled' : 'outlined'}
-                        label={fmtTime(elapsed)}
-                        sx={{ fontVariantNumeric: 'tabular-nums', minWidth: 56 }}
-                      />
+                      <TimeTag tone={running ? 'primary' : 'neutral'} live={running}>{fmtTime(elapsed)}</TimeTag>
                     );
                   }
                 }
                 const spentChip = (!data.editable || task.done) && task.timeSpent > 0 && (
-                  <Chip size="small" variant="outlined" label={t('day.spent', { time: fmtTime(task.timeSpent) })} sx={{ fontVariantNumeric: 'tabular-nums', height: 22 }} />
+                  <TimeTag tone="neutral">{fmtTime(task.timeSpent)}</TimeTag>
                 );
                 return (
                   <Box
                     key={task._id}
-                    sx={{ display: 'flex', alignItems: 'center', gap: 0.5, py: 1, borderBottom: 1, borderColor: 'divider' }}
+                    sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, py: 1.25, borderBottom: 1, borderColor: 'divider' }}
                   >
                     {/* Status: checkbox, or a cross for a missed past task */}
-                    <Box sx={{ flexShrink: 0, width: 40, display: 'grid', placeItems: 'center' }}>
+                    <Box sx={{ flexShrink: 0, width: 36, height: 30, display: 'grid', placeItems: 'center' }}>
                       {!data.editable && !task.done ? (
                         <CloseIcon color="error" />
                       ) : (
@@ -329,18 +321,31 @@ export default function DayView() {
                     </Box>
 
                     {/* Title + target/time meta (this column shrinks, never the controls) */}
-                    <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                    <Box sx={{ flexGrow: 1, minWidth: 0, pt: '4px' }}>
                       <Typography
+                        title={task.title}
+                        onClick={() => setExpanded((e) => ({ ...e, [task._id]: !e[task._id] }))}
                         sx={{
-                          wordBreak: 'break-word',
+                          fontSize: { xs: 13.5, sm: 15 },
+                          fontWeight: 500,
+                          lineHeight: 1.4,
+                          overflowWrap: 'anywhere',
+                          cursor: 'pointer',
                           textDecoration: task.done ? 'line-through' : 'none',
                           color: task.done ? 'text.secondary' : 'text.primary',
+                          // Long titles show 2 lines with "…"; tap to see the full text
+                          ...(expanded[task._id] ? {} : {
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }),
                         }}
                       >
                         {task.title}
                       </Typography>
                       {(task.estimateMinutes || timeChip || spentChip) && (
-                        <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.5 }}>
+                        <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: 'wrap', alignItems: 'center', mt: 0.75 }}>
                           {task.estimateMinutes && (
                             <Typography variant="caption" color="text.secondary">{t('day.target', { n: task.estimateMinutes })}</Typography>
                           )}
@@ -351,19 +356,28 @@ export default function DayView() {
                     </Box>
 
                     {/* Controls: fixed, never overflow */}
-                    <Box sx={{ flexShrink: 0, display: 'flex' }}>
+                    <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', height: 30, gap: 0.5, pr: 0.25 }}>
                       {canTime && (
                         <IconButton
-                          size="small"
-                          color={running ? 'primary' : 'default'}
                           onClick={() => (running ? stopTimer() : startTimer(task))}
                           aria-label={running ? 'Pause timer' : 'Start timer'}
+                          sx={{
+                            ...ROW_BTN,
+                            color: running ? '#fff' : 'text.secondary',
+                            bgcolor: running ? 'primary.main' : 'action.hover',
+                            '&:hover': { bgcolor: running ? 'primary.dark' : 'action.selected' },
+                          }}
                         >
                           {running ? <PauseIcon /> : <PlayArrowIcon />}
                         </IconButton>
                       )}
                       {data.editable && (
-                        <IconButton size="small" onClick={() => remove(task)} disabled={isTmp}>
+                        <IconButton
+                          onClick={() => remove(task)}
+                          disabled={isTmp}
+                          aria-label="Delete task"
+                          sx={{ ...ROW_BTN, color: 'text.secondary', '&:hover': { color: 'error.main', bgcolor: 'action.hover' } }}
+                        >
                           <DeleteOutlineIcon />
                         </IconButton>
                       )}
@@ -410,6 +424,36 @@ export default function DayView() {
         onClose={() => setReasonsOpen(false)}
         onSaved={(r) => setReport(r)}
       />
+    </Box>
+  );
+}
+
+/** Square-ish 30px action button used on each task row */
+const ROW_BTN = { width: 30, height: 30, p: 0, borderRadius: '9px', '& svg': { fontSize: 18 } };
+
+/** Small timer / time-spent tag under a task title; a pulsing dot while the timer runs */
+function TimeTag({ children, tone = 'neutral', live = false }) {
+  const color = tone === 'primary' ? 'primary.main' : tone === 'error' ? 'error.main' : 'text.secondary';
+  return (
+    <Box
+      sx={{
+        display: 'inline-flex', alignItems: 'center', gap: 0.6, height: 22, px: 0.9,
+        borderRadius: '6px', border: 1, borderColor: tone === 'neutral' ? 'divider' : color,
+        color, fontSize: 12, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+      }}
+    >
+      {live ? (
+        <Box
+          sx={{
+            width: 6, height: 6, borderRadius: '50%', bgcolor: color,
+            animation: 'tagPulse 1.2s ease-in-out infinite',
+            '@keyframes tagPulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.25 } },
+          }}
+        />
+      ) : (
+        <TimerOutlinedIcon sx={{ fontSize: 13 }} />
+      )}
+      {children}
     </Box>
   );
 }

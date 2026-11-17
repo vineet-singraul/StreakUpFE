@@ -32,6 +32,10 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import TaskAltIcon from '@mui/icons-material/TaskAlt';
 import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 import Tabs from '@mui/material/Tabs';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import Tab from '@mui/material/Tab';
 import api, { errMsg } from '../api';
 import { useApi } from '../cache';
@@ -521,6 +525,7 @@ export default function Challenge() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [selId, setSelId] = useState(null);
+  const [menuAnchor, setMenuAnchor] = useState(null);
   // several challenges can run at once; older API versions only send `challenge`
   const list = data ? data.challenges || (data.challenge ? [data.challenge] : []) : [];
   const c = list.find((x) => x._id === selId) || list.at(-1);
@@ -581,7 +586,7 @@ export default function Challenge() {
     { icon: <EditIcon />, label: t('ch.edit'), onClick: () => setEditOpen(true), hide: c.finished },
     { icon: <HistoryIcon />, label: t('ch.history'), onClick: () => setHistoryOpen(true) },
     { icon: <AddIcon />, label: t('ch.new'), onClick: () => setNewOpen(true) },
-    { icon: <StopCircleOutlinedIcon />, label: t('ch.end'), onClick: end },
+    { icon: <StopCircleOutlinedIcon />, label: t('ch.end'), onClick: end, danger: true },
   ].filter((a) => !a.hide);
 
   return (
@@ -600,36 +605,94 @@ export default function Challenge() {
         </Tabs>
       )}
       {/* hero */}
-      <Card sx={{ background: HERO_BG, color: '#fff', border: 0 }}>
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Stack direction="row" sx={{ alignItems: 'flex-start', gap: 1 }}>
-            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-              <Typography variant="h5" sx={{ fontSize: { xs: 20, sm: 26 } }}>🏆 {c.title}</Typography>
-              <Typography sx={{ opacity: 0.9, fontSize: { xs: 13, sm: 15 } }}>
-                {c.finished ? t('ch.finished') : t('ch.rulesLine', { tick: data.rules.perTick, bonus: data.rules.perfectBonus })}
-              </Typography>
+      <Card sx={{ background: HERO_BG, color: '#fff', border: 0, position: 'relative', overflow: 'hidden' }}>
+        {/* soft decorative circles */}
+        <Box sx={{ position: 'absolute', width: 180, height: 180, borderRadius: '50%', bgcolor: 'rgba(255,255,255,.08)', top: -70, right: -50, pointerEvents: 'none' }} />
+        <Box sx={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(255,255,255,.06)', bottom: -60, left: -30, pointerEvents: 'none' }} />
+        <CardContent sx={{ p: { xs: 2.25, sm: 3 }, position: 'relative' }}>
+          {/* top row: label + actions */}
+          <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.4, borderRadius: '8px', bgcolor: 'rgba(255,255,255,.18)', fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase' }}>
+              <EmojiEventsIcon sx={{ fontSize: 15 }} />
+              {c.finished ? t('ch.finished') : t('ch.running')}
             </Box>
-            {/* icons on mobile, labelled buttons on laptop */}
-            <Stack direction="row" spacing={0.5} sx={{ display: { xs: 'flex', md: 'none' } }}>
-              {actions.map((a) => (
-                <Tooltip key={a.label} title={a.label}>
-                  <IconButton onClick={a.onClick} sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,.15)' }} size="small">{a.icon}</IconButton>
-                </Tooltip>
-              ))}
-            </Stack>
+            <Box sx={{ flexGrow: 1 }} />
+            {/* mobile: one menu button; laptop: labelled buttons */}
+            <IconButton
+              onClick={(e) => setMenuAnchor(e.currentTarget)}
+              aria-label="Challenge options"
+              sx={{ display: { xs: 'inline-flex', md: 'none' }, color: '#fff', width: 34, height: 34, borderRadius: '10px', bgcolor: 'rgba(255,255,255,.18)', '&:hover': { bgcolor: 'rgba(255,255,255,.28)' } }}
+            >
+              <MoreVertIcon fontSize="small" />
+            </IconButton>
             <Stack direction="row" spacing={1} sx={{ display: { xs: 'none', md: 'flex' } }}>
               {actions.map((a) => (
-                <Button key={a.label} startIcon={a.icon} onClick={a.onClick} sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,.15)', '&:hover': { bgcolor: 'rgba(255,255,255,.25)' } }}>
+                <Button
+                  key={a.label}
+                  size="small"
+                  startIcon={a.icon}
+                  onClick={a.onClick}
+                  sx={{ color: '#fff', px: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,.16)', '&:hover': { bgcolor: 'rgba(255,255,255,.26)' } }}
+                >
                   {a.label}
                 </Button>
               ))}
             </Stack>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={() => setMenuAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+              slotProps={{ paper: { sx: { mt: 0.75, minWidth: 190, borderRadius: '14px', border: 1, borderColor: 'divider' } } }}
+            >
+              {actions.map((a) => (
+                <MenuItem
+                  key={a.label}
+                  onClick={() => { setMenuAnchor(null); a.onClick(); }}
+                  sx={{ py: 1.1, fontSize: 14, fontWeight: 500, ...(a.danger ? { color: 'error.main' } : {}) }}
+                >
+                  <ListItemIcon sx={{ color: a.danger ? 'error.main' : 'text.secondary', '& svg': { fontSize: 20 } }}>{a.icon}</ListItemIcon>
+                  {a.label}
+                </MenuItem>
+              ))}
+            </Menu>
           </Stack>
-          <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 2.5, mb: 0.75 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('ch.dayOf', { d: shownDay, n: c.days })}</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>{pct}%</Typography>
+
+          {/* title */}
+          <Typography
+            sx={{ mt: 1.75, fontSize: { xs: 24, sm: 30 }, fontWeight: 800, lineHeight: 1.2, letterSpacing: -0.3, overflowWrap: 'anywhere' }}
+          >
+            {c.title}
+          </Typography>
+
+          {/* scoring rules as small pills */}
+          {!c.finished && (
+            <Stack direction="row" useFlexGap sx={{ flexWrap: 'wrap', gap: 0.75, mt: 1.25 }}>
+              {[
+                `+${data.rules.perTick} ${t('ch.perTick')}`,
+                `+${data.rules.perfectBonus} ${t('ch.perfectBonus')}`,
+              ].map((txt) => (
+                <Box key={txt} sx={{ px: 1, py: 0.35, borderRadius: '7px', bgcolor: 'rgba(0,0,0,.14)', fontSize: 12, fontWeight: 600 }}>
+                  {txt}
+                </Box>
+              ))}
+            </Stack>
+          )}
+
+          {/* progress */}
+          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'baseline', mt: 2.5, mb: 0.9 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
+              {t('ch.dayOf', { d: shownDay, n: c.days })}
+              <Box component="span" sx={{ opacity: 0.75, fontWeight: 500, ml: 1 }}>· {t('ch.daysLeft', { n: Math.max(0, c.days - shownDay) })}</Box>
+            </Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 800 }}>{pct}%</Typography>
           </Stack>
-          <LinearProgress variant="determinate" value={pct} sx={{ height: 8, borderRadius: 4, bgcolor: 'rgba(255,255,255,.25)', '& .MuiLinearProgress-bar': { bgcolor: '#fff' } }} />
+          <LinearProgress
+            variant="determinate"
+            value={Math.max(pct, 2)}
+            sx={{ height: 8, borderRadius: 99, bgcolor: 'rgba(255,255,255,.25)', '& .MuiLinearProgress-bar': { bgcolor: '#fff', borderRadius: 99 } }}
+          />
         </CardContent>
       </Card>
 
