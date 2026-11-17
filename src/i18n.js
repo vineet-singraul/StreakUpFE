@@ -69,6 +69,8 @@ const D = {
   'rem.snoozed': ['Will remind again in 5 minutes', '5 मिनट बाद फिर याद दिलाएँगे', '5 min baad phir yaad dilayenge'],
   'rem.playSound': ['Play sound', 'आवाज़ चलाएँ', 'Sound chalao'],
   'rem.new': ['New', 'नया', 'New'],
+  'rem.schedule': ['Date & time', 'तारीख और समय', 'Date & time'],
+  'rem.rings': ['Rings {when}', '{when} को बजेगा', '{when} ko bajega'],
   'rem.newTitle': ['New reminder', 'नया रिमाइंडर', 'Naya reminder'],
   'rem.count': ['{n} upcoming', '{n} आने वाले', '{n} upcoming'],
   'rem.ringing': ['Reminder', 'रिमाइंडर', 'Reminder'],

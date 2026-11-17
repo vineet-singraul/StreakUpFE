@@ -229,7 +229,7 @@ export default function Layout() {
               width: 180,
               maxWidth: 'calc(100vw - 24px)',
               p: 0.5,
-              borderRadius: 3,
+              borderRadius: '16px',
               border: 1,
               borderColor: 'divider',
               overflow: 'hidden',
@@ -245,7 +245,7 @@ export default function Layout() {
               key={c.path}
               onClick={() => { setMoreAnchor(null); navigate(c.path); }}
               sx={{
-                gap: 1.25, py: 1, px: 1.25, borderRadius: 2, minHeight: 0,
+                gap: 1.25, py: 1, px: 1.25, borderRadius: '10px', minHeight: 0,
                 mt: idx ? 0.25 : 0,
                 color: on ? 'primary.main' : 'text.primary',
                 bgcolor: on ? 'action.selected' : 'transparent',
@@ -253,7 +253,7 @@ export default function Layout() {
             >
               <Box
                 sx={{
-                  width: 30, height: 30, borderRadius: 2, flexShrink: 0,
+                  width: 30, height: 30, borderRadius: '8px', flexShrink: 0,
                   display: 'grid', placeItems: 'center',
                   color: 'primary.main',
                   bgcolor: 'action.hover',

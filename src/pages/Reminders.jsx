@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
 import Card from '@mui/material/Card';
-import TextField from '@mui/material/TextField';
+import InputBase from '@mui/material/InputBase';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Box from '@mui/material/Box';
@@ -10,8 +10,6 @@ import Chip from '@mui/material/Chip';
 import Switch from '@mui/material/Switch';
 import Alert from '@mui/material/Alert';
 import ButtonBase from '@mui/material/ButtonBase';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
 import Dialog from '@mui/material/Dialog';
@@ -19,7 +17,8 @@ import Divider from '@mui/material/Divider';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
-import AlarmAddIcon from '@mui/icons-material/AlarmAdd';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AlarmIcon from '@mui/icons-material/Alarm';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
@@ -70,11 +69,6 @@ function fromParts({ date, hour, minute, ampm }) {
 const inMinutes = (n) => {
   const d = new Date(Date.now() + n * 60_000);
   d.setSeconds(0, 0);
-  return d;
-};
-const tomorrowAt9 = () => {
-  const d = new Date(Date.now() + 86_400_000);
-  d.setHours(9, 0, 0, 0);
   return d;
 };
 
@@ -165,7 +159,7 @@ export default function Reminders() {
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => setFormOpen(true)}
-          sx={{ background: BRAND_GRADIENT, px: 2.25, py: 1, borderRadius: 99, boxShadow: '0 6px 18px rgba(99,102,241,.35)' }}
+          sx={{ background: BRAND_GRADIENT, color: '#fff', px: 2.25, py: 1, borderRadius: 99, boxShadow: '0 6px 18px rgba(99,102,241,.35)' }}
         >
           {t('rem.new')}
         </Button>
@@ -174,7 +168,7 @@ export default function Reminders() {
       {!pushReady && (
         <Alert
           severity="info"
-          sx={{ borderRadius: 3 }}
+          sx={{ borderRadius: '14px' }}
           action={pushSupported() && Notification.permission !== 'denied'
             ? <Button color="inherit" size="small" onClick={turnOnPush} disabled={busyPush}>{t('rem.enable')}</Button>
             : undefined}
@@ -186,8 +180,8 @@ export default function Reminders() {
       {/* upcoming */}
       {!list ? (
         <Stack spacing={1}>
-          <Skeleton variant="rounded" height={76} sx={{ borderRadius: 4 }} />
-          <Skeleton variant="rounded" height={76} sx={{ borderRadius: 4 }} />
+          <Skeleton variant="rounded" height={76} sx={{ borderRadius: '20px' }} />
+          <Skeleton variant="rounded" height={76} sx={{ borderRadius: '20px' }} />
         </Stack>
       ) : !upcoming.length ? (
         <Card sx={{ textAlign: 'center', py: 5, px: 3 }}>
@@ -254,20 +248,11 @@ function ReminderRow({ r, t, onDelete, done }) {
   );
 }
 
-function Section({ label, children }) {
-  return (
-    <Box>
-      <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, display: 'block', mb: 0.75, lineHeight: 1.5 }}>{label}</Typography>
-      {children}
-    </Box>
-  );
-}
-
 /* =====================================================================
    "+ New" form: full screen on phones, a dialog on desktop
    ===================================================================== */
 
-function NewReminderDialog({ open, onClose }) {
+export function NewReminderDialog({ open, onClose }) {
   const { user } = useAuth();
   const t = useT();
   const toast = useToast();
@@ -286,6 +271,7 @@ function NewReminderDialog({ open, onClose }) {
   const recorder = useRef(null);
   const recTimer = useRef(null);
   const fileInput = useRef(null);
+  const dateRef = useRef(null);
 
   const stopAll = () => {
     stopPreview.current();
@@ -397,185 +383,253 @@ function NewReminderDialog({ open, onClose }) {
       slotProps={{ paper: { sx: { borderRadius: phone ? 0 : 5, bgcolor: 'background.default', backgroundImage: 'none' } } }}
     >
       {/* top bar */}
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1.5, py: 1.25, borderBottom: 1, borderColor: 'divider' }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1, py: 1, borderBottom: 1, borderColor: 'divider' }}>
         <IconButton onClick={close} aria-label="close"><CloseIcon /></IconButton>
-        <Typography sx={{ fontWeight: 800, fontSize: 18, flex: 1 }}>{t('rem.newTitle')}</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: 17, flex: 1 }}>{t('rem.newTitle')}</Typography>
       </Stack>
 
       <Box sx={{ flex: 1, overflowY: 'auto', px: { xs: 2, sm: 3 }, py: 2.5 }}>
-        <Stack spacing={3}>
-          <TextField
-            autoFocus
-            label={t('rem.titleLabel')}
-            placeholder={t('rem.titlePh')}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            slotProps={{ htmlInput: { maxLength: 200 } }}
-            fullWidth
-          />
+        <Stack spacing={2.5}>
+          {/* title */}
+          <Panel>
+            <InputBase
+              autoFocus
+              multiline
+              maxRows={3}
+              placeholder={t('rem.titlePh')}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              inputProps={{ maxLength: 200, 'aria-label': t('rem.titleLabel') }}
+              sx={{ width: '100%', px: 2, py: 1.75, fontSize: 17, fontWeight: 600 }}
+            />
+          </Panel>
 
-          {/* when */}
-          <Section label={t('rem.when')}>
-            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap', mb: 2 }}>
-              {[['rem.in10', () => inMinutes(10)], ['rem.in30', () => inMinutes(30)], ['rem.in1h', () => inMinutes(60)], ['rem.tom9', tomorrowAt9]].map(([k, fn]) => (
-                <Chip key={k} label={t(k)} variant="outlined" clickable onClick={() => setWhen(toParts(fn()))} />
-              ))}
-            </Stack>
-            <Stack spacing={1.5}>
-              <TextField
-                type="date"
-                label={t('rem.date')}
-                value={when.date}
-                onChange={(e) => e.target.value && setWhen((w) => ({ ...w, date: e.target.value }))}
-                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: isoDate(new Date()) } }}
-                fullWidth
-              />
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <TextField
-                  select
-                  label={t('rem.hour')}
+          {/* schedule */}
+          <Box>
+            <PanelLabel>{t('rem.schedule')}</PanelLabel>
+            <Panel>
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'center', gap: 1, py: 2.5 }}>
+                <BigSelect
                   value={when.hour}
                   onChange={(e) => setWhen((w) => ({ ...w, hour: Number(e.target.value) }))}
-                  slotProps={{ select: { native: true } }}
-                  sx={{ flex: 1 }}
+                  aria-label={t('rem.hour')}
                 >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{h}</option>)}
-                </TextField>
-                <Typography sx={{ fontWeight: 800, fontSize: 20 }}>:</Typography>
-                <TextField
-                  select
-                  label={t('rem.min')}
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={h}>{pad(h)}</option>)}
+                </BigSelect>
+                <Typography sx={{ fontSize: 40, fontWeight: 700, opacity: 0.5, mt: -0.75 }}>:</Typography>
+                <BigSelect
                   value={when.minute}
                   onChange={(e) => setWhen((w) => ({ ...w, minute: Number(e.target.value) }))}
-                  slotProps={{ select: { native: true } }}
-                  sx={{ flex: 1 }}
+                  aria-label={t('rem.min')}
                 >
                   {Array.from({ length: 60 }, (_, i) => i).map((m) => <option key={m} value={m}>{pad(m)}</option>)}
-                </TextField>
-                <ToggleButtonGroup
-                  exclusive
-                  color="primary"
-                  value={when.ampm}
-                  onChange={(_, v) => v && setWhen((w) => ({ ...w, ampm: v }))}
-                  sx={{ height: 56 }}
-                >
-                  <ToggleButton value="AM" sx={{ px: 1.75, fontWeight: 800 }}>AM</ToggleButton>
-                  <ToggleButton value="PM" sx={{ px: 1.75, fontWeight: 800 }}>PM</ToggleButton>
-                </ToggleButtonGroup>
+                </BigSelect>
+                <Stack sx={{ ml: 1, borderRadius: '10px', overflow: 'hidden', border: 1, borderColor: 'divider' }}>
+                  {['AM', 'PM'].map((v) => {
+                    const on = when.ampm === v;
+                    return (
+                      <ButtonBase
+                        key={v}
+                        onClick={() => setWhen((w) => ({ ...w, ampm: v }))}
+                        sx={{
+                          px: 2, height: 33, fontSize: 14, fontWeight: 700,
+                          color: on ? '#fff' : 'text.secondary',
+                          bgcolor: on ? 'primary.main' : 'transparent',
+                          transition: 'background-color .15s',
+                        }}
+                      >
+                        {v}
+                      </ButtonBase>
+                    );
+                  })}
+                </Stack>
               </Stack>
-            </Stack>
-            <Box
-              sx={{
-                mt: 1.5, px: 1.5, py: 1, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1,
-                bgcolor: inPast ? 'error.main' : 'action.hover', color: inPast ? '#fff' : 'text.primary',
-              }}
-            >
-              <AlarmIcon fontSize="small" />
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{inPast ? t('rem.pastTime') : fmtWhen(at, t)}</Typography>
-            </Box>
-          </Section>
+              <Divider />
+              <ButtonBase
+                onClick={() => { const el = dateRef.current; try { el.showPicker(); } catch { el.focus(); el.click(); } }}
+                sx={{ width: '100%', justifyContent: 'flex-start', gap: 1.5, px: 2, py: 1.5, position: 'relative' }}
+              >
+                <RowIcon><CalendarMonthIcon /></RowIcon>
+                <Typography sx={{ fontWeight: 600, flex: 1, textAlign: 'left' }}>{t('rem.date')}</Typography>
+                <Typography color="text.secondary" sx={{ fontWeight: 500 }}>{dayLabel(at, t)}{dayLabel(at, t).includes(',') ? '' : `, ${at.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`}</Typography>
+                <ChevronRightIcon sx={{ color: 'text.secondary' }} />
+                <input
+                  ref={dateRef}
+                  type="date"
+                  value={when.date}
+                  min={isoDate(new Date())}
+                  onChange={(e) => e.target.value && setWhen((w) => ({ ...w, date: e.target.value }))}
+                  tabIndex={-1}
+                  aria-hidden
+                  style={{ position: 'absolute', right: 16, bottom: 0, width: 1, height: 1, opacity: 0, border: 0, padding: 0 }}
+                />
+              </ButtonBase>
+            </Panel>
+          </Box>
 
           {/* sound */}
-          <Section label={t('rem.sound')}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
-              {TONES.map((name) => {
-                const on = tone === name;
-                return (
-                  <ButtonBase
-                    key={name}
-                    onClick={() => chooseTone(name)}
-                    sx={{
-                      flexDirection: 'column', gap: 0.75, py: 1.5, borderRadius: 3,
-                      border: 1.5, borderColor: on ? 'primary.main' : 'divider',
-                      bgcolor: on ? 'action.selected' : 'background.paper',
-                    }}
-                  >
-                    <IconBubble active={on} size={38}>{TONE_ICON[name]}</IconBubble>
-                    <Typography sx={{ fontSize: 12.5, fontWeight: on ? 800 : 500 }}>{t(`rem.tone.${name}`)}</Typography>
-                  </ButtonBase>
-                );
-              })}
-            </Box>
-
-            {tone === 'song' && (
-              <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
-                <input ref={fileInput} type="file" accept="audio/*" hidden onChange={onSongPicked} />
-                <Button variant="outlined" startIcon={<MusicNoteIcon />} onClick={() => fileInput.current?.click()}>
-                  {song ? t('rem.changeSong') : t('rem.pickSong')}
-                </Button>
-                {song && (
-                  <>
-                    <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{song.name}</Typography>
-                    <IconButton onClick={() => preview(() => playBlob(song, { loop: false }))}><PlayArrowIcon /></IconButton>
-                    <IconButton onClick={() => stopPreview.current()}><StopIcon /></IconButton>
-                  </>
-                )}
-              </Stack>
-            )}
-
-            {tone === 'voice' && (
-              <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
-                {recording ? (
-                  <Button variant="contained" color="error" startIcon={<StopIcon />} onClick={stopRec}>
-                    {t('rem.stopRec')} · {recording}s
-                  </Button>
-                ) : (
-                  <Button variant="outlined" startIcon={<MicIcon />} onClick={startRec}>
-                    {voice ? t('rem.reRecord') : t('rem.record')}
-                  </Button>
-                )}
-                {voice && !recording && (
-                  <>
-                    <Chip size="small" color="success" icon={<CheckCircleIcon />} label={t('rem.recorded')} />
-                    <IconButton onClick={() => preview(() => playBlob(voice, { loop: false }))}><PlayArrowIcon /></IconButton>
-                    <IconButton onClick={() => stopPreview.current()}><StopIcon /></IconButton>
-                  </>
-                )}
-              </Stack>
-            )}
-            {['song', 'voice'].includes(tone) && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>{t('rem.deviceOnly')}</Typography>
-            )}
-          </Section>
-
-          {/* read aloud */}
-          {ttsSupported() && (
-            <Card>
-              <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', p: 1.5 }}>
-                <IconBubble size={38}><RecordVoiceOverIcon /></IconBubble>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700 }}>{t('rem.speak')}</Typography>
-                  <Typography variant="caption" color="text.secondary">{t('rem.speakNote')}</Typography>
+          <Box>
+            <PanelLabel>{t('rem.sound')}</PanelLabel>
+            <Panel>
+              <Box sx={{ p: 1.5 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0.75 }}>
+                  {TONES.map((name) => {
+                    const on = tone === name;
+                    return (
+                      <ButtonBase
+                        key={name}
+                        onClick={() => chooseTone(name)}
+                        sx={{
+                          justifyContent: 'flex-start', gap: 0.75, py: 0.75, pl: 0.75, pr: 1, borderRadius: '10px',
+                          border: 1, borderColor: on ? 'primary.main' : 'divider',
+                          bgcolor: on ? 'action.selected' : 'transparent',
+                          minWidth: 0,
+                        }}
+                      >
+                        <IconBubble active={on} size={24}>{TONE_ICON[name]}</IconBubble>
+                        <Typography noWrap sx={{ fontSize: 12, fontWeight: on ? 700 : 500 }}>{t(`rem.tone.${name}`)}</Typography>
+                      </ButtonBase>
+                    );
+                  })}
                 </Box>
-                <Tooltip title={t('rem.listen')}>
-                  <span>
-                    <IconButton disabled={!title.trim()} onClick={() => preview(() => speak(`Reminder. ${title.trim()}`, user?.language).then(() => null))}>
-                      <PlayArrowIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Switch checked={speakOn} onChange={(e) => setSpeakOn(e.target.checked)} />
-              </Stack>
-            </Card>
-          )}
+
+                {tone === 'song' && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
+                    <input ref={fileInput} type="file" accept="audio/*" hidden onChange={onSongPicked} />
+                    <Button size="small" variant="outlined" startIcon={<MusicNoteIcon />} onClick={() => fileInput.current?.click()}>
+                      {song ? t('rem.changeSong') : t('rem.pickSong')}
+                    </Button>
+                    {song && (
+                      <>
+                        <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>{song.name}</Typography>
+                        <IconButton size="small" onClick={() => preview(() => playBlob(song, { loop: false }))}><PlayArrowIcon /></IconButton>
+                        <IconButton size="small" onClick={() => stopPreview.current()}><StopIcon /></IconButton>
+                      </>
+                    )}
+                  </Stack>
+                )}
+
+                {tone === 'voice' && (
+                  <Stack direction="row" spacing={1} sx={{ mt: 1.5, alignItems: 'center' }}>
+                    {recording ? (
+                      <Button size="small" variant="contained" color="error" startIcon={<StopIcon />} onClick={stopRec}>
+                        {t('rem.stopRec')} · {recording}s
+                      </Button>
+                    ) : (
+                      <Button size="small" variant="outlined" startIcon={<MicIcon />} onClick={startRec}>
+                        {voice ? t('rem.reRecord') : t('rem.record')}
+                      </Button>
+                    )}
+                    {voice && !recording && (
+                      <>
+                        <Chip size="small" color="success" icon={<CheckCircleIcon />} label={t('rem.recorded')} />
+                        <IconButton size="small" onClick={() => preview(() => playBlob(voice, { loop: false }))}><PlayArrowIcon /></IconButton>
+                        <IconButton size="small" onClick={() => stopPreview.current()}><StopIcon /></IconButton>
+                      </>
+                    )}
+                  </Stack>
+                )}
+                {['song', 'voice'].includes(tone) && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>{t('rem.deviceOnly')}</Typography>
+                )}
+              </Box>
+
+              {ttsSupported() && (
+                <>
+                  <Divider />
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', px: 2, py: 1.25 }}>
+                    <RowIcon><RecordVoiceOverIcon /></RowIcon>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>{t('rem.speak')}</Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3, display: 'block' }}>{t('rem.speakNote')}</Typography>
+                    </Box>
+                    <Tooltip title={t('rem.listen')}>
+                      <span>
+                        <IconButton size="small" disabled={!title.trim()} onClick={() => preview(() => speak(`Reminder. ${title.trim()}`, user?.language).then(() => null))}>
+                          <PlayArrowIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                    <Switch checked={speakOn} onChange={(e) => setSpeakOn(e.target.checked)} />
+                  </Stack>
+                </>
+              )}
+            </Panel>
+          </Box>
         </Stack>
       </Box>
 
-      {/* save bar stays at the bottom */}
-      <Divider />
-      <Box sx={{ p: 2, pb: phone ? 'calc(16px + env(safe-area-inset-bottom))' : 2 }}>
+      {/* footer: summary + save */}
+      <Box sx={{ px: 2, pt: 1.5, pb: phone ? 'calc(16px + env(safe-area-inset-bottom))' : 2, borderTop: 1, borderColor: 'divider' }}>
+        <Typography
+          variant="body2"
+          sx={{ textAlign: 'center', mb: 1.25, fontWeight: 500, color: inPast ? 'error.main' : 'text.secondary' }}
+        >
+          {inPast ? t('rem.pastTime') : t('rem.rings', { when: fmtWhen(at, t) })}
+        </Typography>
         <Button
           fullWidth
           variant="contained"
           size="large"
-          startIcon={<AlarmAddIcon />}
           onClick={save}
-          disabled={saving || Boolean(recording)}
-          sx={{ py: 1.4, borderRadius: 99, background: BRAND_GRADIENT, fontSize: 16 }}
+          disabled={saving || Boolean(recording) || inPast}
+          sx={{
+            py: 1.4, borderRadius: '14px', fontSize: 16, fontWeight: 700, color: '#fff',
+            background: BRAND_GRADIENT,
+            '&.Mui-disabled': { background: 'none', bgcolor: 'action.disabledBackground' },
+          }}
         >
           {t('rem.save')}
         </Button>
       </Box>
     </Dialog>
+  );
+}
+
+/* ---------- small building blocks for the form ---------- */
+
+/** Rounded grouped container (iOS-settings style) */
+function Panel({ children }) {
+  return (
+    <Box sx={{ borderRadius: '16px', border: 1, borderColor: 'divider', bgcolor: 'background.paper', overflow: 'hidden' }}>
+      {children}
+    </Box>
+  );
+}
+
+function PanelLabel({ children }) {
+  return (
+    <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'text.secondary', mb: 1, ml: 0.5 }}>
+      {children}
+    </Typography>
+  );
+}
+
+/** Tinted square icon at the start of a row */
+function RowIcon({ children }) {
+  return (
+    <Box sx={{ width: 34, height: 34, borderRadius: '10px', flexShrink: 0, display: 'grid', placeItems: 'center', color: 'primary.main', bgcolor: 'action.hover', '& svg': { fontSize: 19 } }}>
+      {children}
+    </Box>
+  );
+}
+
+/** Big hour / minute digits; a native select so phones show their own wheel picker */
+function BigSelect({ children, ...props }) {
+  return (
+    <Box
+      component="select"
+      {...props}
+      sx={{
+        appearance: 'none', WebkitAppearance: 'none', border: 0, outline: 0, cursor: 'pointer',
+        fontFamily: 'inherit', fontSize: 46, fontWeight: 800, lineHeight: 1, letterSpacing: -1,
+        color: 'text.primary', bgcolor: 'action.hover', borderRadius: '12px',
+        width: 84, py: 1, textAlign: 'center', textAlignLast: 'center',
+        '&:hover, &:focus-visible': { bgcolor: 'action.selected' },
+        '& option': { fontSize: 16, color: 'text.primary', bgcolor: 'background.paper' },
+      }}
+    >
+      {children}
+    </Box>
   );
 }
