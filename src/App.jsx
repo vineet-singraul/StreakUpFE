@@ -14,6 +14,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Challenge = lazy(() => import('./pages/Challenge'));
 const Rewards = lazy(() => import('./pages/Rewards'));
+const Reminders = lazy(() => import('./pages/Reminders'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Install = lazy(() => import('./pages/Install'));
 
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/challenge" element={page(<Challenge />)} />
         <Route path="/rewards" element={page(<Rewards />)} />
         <Route path="/settings" element={page(<Settings />)} />
+        <Route path="/reminders" element={page(<Reminders />)} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

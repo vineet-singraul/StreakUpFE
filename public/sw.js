@@ -28,6 +28,10 @@ self.addEventListener('push', (event) => {
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       data: { url: data.url || '/' },
+      // set for user reminders: stays on screen, vibrates, replaces an older copy of the same reminder
+      ...(data.tag ? { tag: data.tag, renotify: true } : {}),
+      ...(data.requireInteraction ? { requireInteraction: true } : {}),
+      ...(data.vibrate ? { vibrate: data.vibrate } : {}),
     }),
   );
 });
