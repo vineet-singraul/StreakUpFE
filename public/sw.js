@@ -32,12 +32,22 @@ self.addEventListener('push', (event) => {
       ...(data.tag ? { tag: data.tag, renotify: true } : {}),
       ...(data.requireInteraction ? { requireInteraction: true } : {}),
       ...(data.vibrate ? { vibrate: data.vibrate } : {}),
+      ...(data.actions ? { actions: data.actions } : {}),
+      ...(data.actionUrl ? { data: { url: data.url || '/', actionUrl: data.actionUrl } } : {}),
     }),
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  // Reminder "Stop" / "Snooze" buttons: handled right here, works from the lock screen without opening the app
+  const actionUrl = event.notification.data?.actionUrl;
+  if (actionUrl && (event.action === 'stop' || event.action === 'snooze')) {
+    const url = new URL(actionUrl, self.location.origin);
+    url.searchParams.set('do', event.action);
+    event.waitUntil(fetch(url.href, { method: 'POST' }).catch(() => {}));
+    return;
+  }
   const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

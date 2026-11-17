@@ -129,7 +129,7 @@ export default function ReminderRinger() {
 
   // "Test" button on the Reminders page: show the real alarm screen right now
   useEffect(() => {
-    const onTest = (e) => { setRinging(e.detail); startSound(e.detail); };
+    const onTest = (e) => { setRinging({ ...e.detail, isTest: true }); startSound(e.detail); };
     window.addEventListener(REMINDER_TEST, onTest);
     return () => window.removeEventListener(REMINDER_TEST, onTest);
   }, [startSound]);
@@ -150,11 +150,27 @@ export default function ReminderRinger() {
 
   useEffect(() => () => stopSound(), []);
 
-  const close = () => { stopSound(); setRinging(null); setNeedsTap(false); };
+  // Clear the lock-screen notification for this reminder too
+  const clearNotification = (id) => {
+    navigator.serviceWorker?.getRegistration().then((reg) => reg?.getNotifications({ tag: `reminder-${id}` }))
+      .then((list) => list?.forEach((n) => n.close())).catch(() => {});
+  };
+
+  const close = (tellServer = true) => {
+    const r = ringing;
+    stopSound();
+    setRinging(null);
+    setNeedsTap(false);
+    if (r && !r.isTest) {
+      // tell the server to stop re-sending the alarm notification every minute
+      if (tellServer) api.post(`/reminders/${r._id}/stop`).catch(() => {});
+      clearNotification(r._id);
+    }
+  };
 
   const snooze = async () => {
     const r = ringing;
-    close();
+    close(false); // the snooze PATCH below resets the ring on the server
     try {
       await api.patch(`/reminders/${r._id}`, { at: new Date(Date.now() + 5 * 60 * 1000).toISOString() });
       toast(t('rem.snoozed'));
