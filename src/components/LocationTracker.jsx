@@ -28,6 +28,7 @@ import DialogActions from '@mui/material/DialogActions';
 import CircularProgress from '@mui/material/CircularProgress';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
+import TravelExploreIcon from '@mui/icons-material/TravelExplore';
 import api, { errMsg } from '../api';
 
 const POLL_MS = 30_000;
@@ -103,15 +104,33 @@ function LocationMap({ users, onSelect, focus }) {
   return <Box ref={el} sx={{ height: { xs: 320, md: 440 }, borderRadius: 2, overflow: 'hidden', zIndex: 0 }} />;
 }
 
-function DetailsDialog({ userId, onClose, onLocate }) {
+function DetailsDialog({ userId, onClose, onLocate, onRefreshed }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
   useEffect(() => {
     if (!userId) return;
     setData(null);
     setError('');
+    setNote('');
     api.get(`/admin/location-tracker/${userId}`).then((r) => setData(r.data)).catch((e) => setError(errMsg(e)));
   }, [userId]);
+
+  const refreshOne = async () => {
+    setBusy(true);
+    setNote('');
+    try {
+      const { data: res } = await api.post(`/admin/location-tracker/${userId}/refresh`);
+      setData((d) => ({ ...d, user: res.user }));
+      setNote(res.changed ? `Updated — city is now ${res.user.city || '—'}` : 'Refreshed — no change in city');
+      onRefreshed?.();
+    } catch (e) {
+      setNote(errMsg(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const u = data?.user;
   return (
@@ -158,7 +177,15 @@ function DetailsDialog({ userId, onClose, onLocate }) {
           </>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ flexWrap: 'wrap', gap: 1 }}>
+        {note && <Typography variant="caption" color="text.secondary" sx={{ mr: 'auto', pl: 1 }}>{note}</Typography>}
+        <Button
+          startIcon={busy ? <CircularProgress size={16} /> : <TravelExploreIcon />}
+          disabled={!u || busy}
+          onClick={refreshOne}
+        >
+          Refresh location
+        </Button>
         <Button
           startIcon={<MyLocationIcon />}
           disabled={!u || u.latitude == null}
@@ -166,7 +193,6 @@ function DetailsDialog({ userId, onClose, onLocate }) {
         >
           Show on live map
         </Button>
-        <Box sx={{ flexGrow: 1 }} />
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>
@@ -184,6 +210,8 @@ export default function LocationTracker() {
   const [list, setList] = useState(cache.list);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  const [refreshNote, setRefreshNote] = useState('');
   const [selected, setSelected] = useState(null);
   const [focus, setFocus] = useState(null); // { userId, n } -> map flies to this user
   const mapRef = useRef(null);
@@ -237,6 +265,22 @@ export default function LocationTracker() {
     return () => clearInterval(id);
   }, [load]);
 
+  // Re-geolocate every user's last-known IP right now (same job that runs at 12 AM)
+  const refreshAll = useCallback(async () => {
+    if (refreshingAll) return;
+    setRefreshingAll(true);
+    setRefreshNote('');
+    try {
+      const { data } = await api.post('/admin/location-tracker/refresh');
+      setRefreshNote(`Re-checked ${data.checked} user(s) · ${data.updated} updated · ${data.cityChanged} city change(s)`);
+      await load({ force: true });
+    } catch (e) {
+      setRefreshNote(errMsg(e));
+    } finally {
+      setRefreshingAll(false);
+    }
+  }, [refreshingAll, load]);
+
   const setFilter = (key) => (e) => setQ((p) => ({ ...p, [key]: e.target.value, page: 0 }));
   const opts = list?.filters || { countries: [], states: [], cities: [] };
   const select = (key, label, values) => (
@@ -250,8 +294,23 @@ export default function LocationTracker() {
     <Stack spacing={2}>
       <Stack direction="row" sx={{ alignItems: 'center' }}>
         <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>Location Tracker</Typography>
-        <Button startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => load({ force: true })} disabled={loading}>Refresh</Button>
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Har user ke last-known IP ko abhi dobara geolocate karta hai (yahi 12 AM par apne aap chalta hai)">
+            <span>
+              <Button
+                variant="outlined"
+                startIcon={refreshingAll ? <CircularProgress size={16} /> : <TravelExploreIcon />}
+                onClick={refreshAll}
+                disabled={refreshingAll}
+              >
+                Re-fetch all locations
+              </Button>
+            </span>
+          </Tooltip>
+          <Button startIcon={loading ? <CircularProgress size={16} /> : <RefreshIcon />} onClick={() => load({ force: true })} disabled={loading}>Refresh</Button>
+        </Stack>
       </Stack>
+      {refreshNote && <Alert severity="info" onClose={() => setRefreshNote('')}>{refreshNote}</Alert>}
       {error && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => load({ force: true })}>Retry</Button>}>{error}</Alert>}
 
       <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' } }}>
@@ -347,7 +406,7 @@ export default function LocationTracker() {
         </CardContent>
       </Card>
 
-      <DetailsDialog userId={selected} onClose={() => setSelected(null)} onLocate={locate} />
+      <DetailsDialog userId={selected} onClose={() => setSelected(null)} onLocate={locate} onRefreshed={() => load({ force: true })} />
     </Stack>
   );
 }
